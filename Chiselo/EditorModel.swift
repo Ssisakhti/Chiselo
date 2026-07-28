@@ -161,7 +161,7 @@ final class EditorModel: ObservableObject {
         }
         if let backupURL = safety.backupURL {
             let prefix = safety.backupCreated ? "Original file backed up automatically" : "Existing original backup found"
-            return "\(prefix)：\(backupURL.lastPathComponent)"
+            return "\(prefix): \(backupURL.lastPathComponent)"
         }
         return "Back up the original HTML file before applying changes."
     }
@@ -2320,8 +2320,8 @@ final class EditorModel: ObservableObject {
         let stylesheets = diagnostics.stylesheetCount ?? 0
         let externalSheets = diagnostics.externalStylesheetCount ?? 0
         let externalAffectedChanges = diagnostics.externalStylesheetAffectedChangeCount ?? 0
-        let ruleTargets = diagnostics.stylesheetRuleWritebackTargets.prefix(3).joined(separator: "、")
-        let ruleTargetSuffix = ruleTargets.isEmpty ? "" : "（\(ruleTargets)）"
+        let ruleTargets = diagnostics.stylesheetRuleWritebackTargets.prefix(3).joined(separator: ", ")
+        let ruleTargetSuffix = ruleTargets.isEmpty ? "" : " (\(ruleTargets))"
         if ruleWrites > 0 && inlineChanges == 0 {
             return "Source writeback: \(ruleWrites) style change(s) written to local CSS rules\(ruleTargetSuffix)"
         }

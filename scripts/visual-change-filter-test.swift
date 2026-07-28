@@ -39,6 +39,7 @@ struct VisualChangeFilterTest {
         try expect(VisualChangeFilter.deleted.items(from: items).count == 1, "Deleted filter should match deleted objects.")
         try expect(items[0].id.contains("text-key"), "Visual change item id should prefer the stable change key.")
         try expect(items[0].canRevert == true, "Visual change item should decode revertability metadata.")
+        try expect(items.map(\.kindDisplay) == ["Text", "Image", "Position/Size", "Style", "Style", "Deleted Object"], "Stable visual-change protocol kinds should have English display labels.")
         try expect(diagnostics.visualChangeTargetIds == ["text-1", "image-1", "fallback-1"], "All target ids should be deduplicated and include fallback.")
         try expect(diagnostics.visualChangeTargetIds(for: .text) == ["text-1"], "Filtered target ids should use preview items for text.")
         try expect(diagnostics.visualChangeTargetIds(for: .deleted).isEmpty, "Deleted preview item without element id should not become a target.")

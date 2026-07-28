@@ -2838,7 +2838,7 @@
     if (!node) return "";
     const tag = node.tagName?.toLowerCase?.() || "";
     const text = normalizedText(node).slice(0, 28);
-    return text ? `${tag}「${text}」` : directNodeToken(node);
+    return text ? `${tag} “${text}”` : directNodeToken(node);
   }
 
   function directSourceIdentityTokens(node) {
@@ -7204,7 +7204,7 @@ ${htmlSlides}
 
     const count = filteredRecords.length;
     if (count > 0) {
-      const detail = [...changedKinds].slice(0, 4).join("、");
+      const detail = [...changedKinds].slice(0, 4).map(visualKindLabel).join(", ");
       addDiagnosticIssue(issues, {
         kind: "visual-change",
         severity: "warning",
@@ -7862,6 +7862,17 @@ ${htmlSlides}
   // them, and Swift maps them to English at the display boundary via VisualKindLabel. Changing a
   // value here requires updating every consumer in this file, DeckModel.swift, ContentView.swift,
   // and the visual-change tests together.
+  function visualKindLabel(kind) {
+    return {
+      "图片": "Image",
+      "文字": "Text",
+      "样式": "Style",
+      "位置/尺寸": "Position/Size",
+      "删除对象": "Deleted Object",
+      "新增对象": "Added Object"
+    }[kind] || kind;
+  }
+
   function visualEntryChangeKind(before, after) {
     if (before.imageSource !== after.imageSource) return "图片";
     if (before.text !== after.text && !(before.childElementCount > 0 || after.childElementCount > 0)) return "文字";
@@ -7898,7 +7909,7 @@ ${htmlSlides}
     }
 
     if (count > 0) {
-      const reasonList = [...reasons].slice(0, 4).join("、");
+      const reasonList = [...reasons].slice(0, 4).join(", ");
       addDiagnosticIssue(issues, {
         kind: "pptx-effect-risk",
         severity: "warning",
@@ -8177,9 +8188,9 @@ ${htmlSlides}
     const tag = node.tagName.toLowerCase();
     const id = node.id ? `#${node.id}` : "";
     const text = normalizedText(node);
-    if (text) return `${tag}${id}「${truncateDiagnosticText(text, "")}」`;
+    if (text) return `${tag}${id} “${truncateDiagnosticText(text, "")}”`;
     const alt = node.getAttribute("alt") || node.getAttribute("aria-label") || "";
-    if (alt) return `${tag}${id}「${truncateDiagnosticText(alt, "")}」`;
+    if (alt) return `${tag}${id} “${truncateDiagnosticText(alt, "")}”`;
     return `${tag}${id || ""}`;
   }
 

@@ -1385,7 +1385,7 @@ private struct SourceWritebackSelectorList: View {
     }
 
     private var selectorDetail: String {
-        let visible = selectors.joined(separator: "、")
+        let visible = selectors.joined(separator: ", ")
         let hidden = max(0, totalCount - selectors.count)
         return hidden > 0 ? "\(visible), plus \(hidden) more rule(s)" : visible
     }
@@ -2529,7 +2529,7 @@ private struct EditableVersionSummary: Equatable {
         if canvasFallbackCount > 0 { parts.append("\(canvasFallbackCount) canvas region(s)") }
         let other = wholeObjectCount - iframeFallbackCount - canvasFallbackCount
         if other > 0 { parts.append("\(other) media/embedded object(s)") }
-        return parts.joined(separator: "，")
+        return parts.joined(separator: ", ")
     }
 
     var pptxDetail: String {
@@ -2891,8 +2891,8 @@ private extension HTMLDiagnostics {
         let stylesheets = stylesheetCount ?? 0
         let externalSheets = externalStylesheetCount ?? 0
         let externalAffectedChanges = externalStylesheetAffectedChangeCount ?? 0
-        let ruleTargets = stylesheetRuleWritebackTargets.prefix(3).joined(separator: "、")
-        let ruleTargetSuffix = ruleTargets.isEmpty ? "" : "（\(ruleTargets)）"
+        let ruleTargets = stylesheetRuleWritebackTargets.prefix(3).joined(separator: ", ")
+        let ruleTargetSuffix = ruleTargets.isEmpty ? "" : " (\(ruleTargets))"
         if ruleWrites > 0 && inlineChanges == 0 {
             return "\(ruleWrites) style change(s) written to local CSS rules\(ruleTargetSuffix), which keeps the source easier to maintain."
         }
@@ -5050,7 +5050,7 @@ private struct InspectorPanel: View {
     private func locateSourceNodeItem(_ item: EditorSourceNodeItem, statusPrefix: String) {
         invalidateSourceDraftValidationPreview()
         model.selectHTMLNode(id: item.id)
-        model.status = "\(statusPrefix)：\(item.tagName.uppercased())"
+        model.status = "\(statusPrefix): \(item.tagName.uppercased())"
     }
 
     @ViewBuilder
@@ -5823,7 +5823,7 @@ private struct SourceDraftValidation: Equatable {
         if parts.isEmpty {
             parts.append("whitespace or indentation changed")
         }
-        return parts.joined(separator: "，")
+        return parts.joined(separator: ", ")
     }
 
     private static func normalizedLines(_ text: String) -> [String] {
