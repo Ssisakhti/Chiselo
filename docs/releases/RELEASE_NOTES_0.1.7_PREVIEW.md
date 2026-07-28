@@ -2,11 +2,9 @@
 
 Chiselo is a native macOS app for high-fidelity refinement and delivery of existing HTML files.
 
-中文：Chiselo 是一款 HTML 精修与交付工具。打开已有 HTML 页面/文档，精修文字、图片、表格、模块和版式，交付前预检问题，然后导出干净 HTML、高保真 PDF 或尽量可编辑的 PPTX。
-
 ## What Changed In 0.1.7
 
-- Makes the `PPTX 可编辑对象` report actionable: click non-zero text, image, shape, review, or whole-object counts to locate the first matching object before export.
+- Makes the `PPTX Editable Objects` report actionable: click non-zero text, image, shape, review, or whole-object counts to locate the first matching object before export.
 - Adds target tracking for PPTX review objects such as tables, SVG/vector content, complex effects, and layered objects.
 - Adds target tracking for whole-object fallbacks such as embedded pages, canvas regions, shadow components, and script-rendered runtime roots.
 - Rewords visible PPTX guidance toward export review actions instead of implementation details.
@@ -23,7 +21,7 @@ The PPTX report is no longer only a scorecard. It now helps users move directly 
 3. Drag `Chiselo.app` to `Applications`.
 4. Launch Chiselo.
 
-This preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, read the included `首次打开帮助.txt`.
+This preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, read the included `First Launch Help.txt`.
 
 For GitHub Releases, publish the final downloadable build as a normal release instead of a pre-release when the website button should always resolve to the newest asset through `/releases/latest`.
 

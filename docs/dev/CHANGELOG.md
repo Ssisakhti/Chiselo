@@ -52,13 +52,13 @@ All notable changes to Chiselo will be documented here.
 ## 0.1.10 - 2026-06-13
 
 - Added target lists for object-level visual changes so changed text, images, geometry, and style objects can be reviewed beyond the first changed object.
-- Added a `视觉变更复核` card in export preflight with next/previous object navigation before HTML/PDF/PPTX delivery.
+- Added a `Visual Change Review` card in export preflight with next/previous object navigation before HTML/PDF/PPTX delivery.
 - Updated the sidebar delivery check to use the same visual-change target list for consistent object selection.
 - Bumped the packaging version to `0.1.10` for the next preview build.
 
 ## 0.1.9 - 2026-06-13
 
-- Added PPTX preflight `建议操作` repair actions for locating tables, SVG/vector objects, complex visual effects, and layered objects from the export panel.
+- Added PPTX preflight `Suggested Actions` repair actions for locating tables, SVG/vector objects, complex visual effects, and layered objects from the export panel.
 - Added direct preflight actions for converting dynamic or whole-object HTML into an editable version and for choosing PDF when visual fidelity is the safer delivery path.
 - Kept repair actions in object-facing language so users see tables, vectors, effects, layers, editable version, and PDF rather than implementation details.
 - Bumped the packaging version to `0.1.9` for the next preview build.
@@ -66,7 +66,7 @@ All notable changes to Chiselo will be documented here.
 ## 0.1.8 - 2026-06-13
 
 - Added target lists for PPTX editable-object diagnostics so text, image, shape, review, and whole-object fallback groups can be reviewed beyond the first matching object.
-- Added `逐项定位` controls in the PPTX preflight report for next/previous navigation across editable objects and export-risk objects before delivery.
+- Added `Step Through` controls in the PPTX preflight report for next/previous navigation across editable objects and export-risk objects before delivery.
 - Added regression coverage for multi-target PPTX review navigation and dynamic HTML whole-object fallback lists.
 - Bumped the packaging version to `0.1.8` for the next preview build.
 
@@ -79,7 +79,7 @@ All notable changes to Chiselo will be documented here.
 
 ## 0.1.6 - 2026-06-12
 
-- Added `转为可编辑版` Layout IR v1: runtime HTML is captured after rendering into deterministic text, image, shape, pseudo-element, and whole-object fallback elements.
+- Added `Convert to Editable Version` Layout IR v1: runtime HTML is captured after rendering into deterministic text, image, shape, pseudo-element, and whole-object fallback elements.
 - Added an editable-version quality summary that reports directly editable text, replaceable images, adjustable shapes, approximated objects, whole-object fallbacks, and PPTX editability.
 - Added deterministic module grouping metadata for captured cards, sections, tables, and visual modules so related text, shapes, and pseudo-elements can be identified together.
 - Added module-group selection and refinement for editable versions: grouped cards/modules can be selected as one unit, nudged, aligned, snapped, duplicated, deleted, locked, moved together, and refined internally with same-width, same-height, and equal-spacing commands.
@@ -135,7 +135,7 @@ Stability patch focused on repeatable HTML editing and generated fixture coverag
 
 Patch preview update focused on first-install guidance for non-technical users.
 
-- Added a dedicated `首次打开帮助.txt` file into the DMG package.
+- Added a dedicated first-launch help file into the DMG package.
 - Expanded first-launch troubleshooting for blocked, unverified, and “move to trash” macOS alerts.
 - Documented `Open Anyway`, Finder right-click `Open`, and quarantine removal steps.
 - Updated packaging and publishing docs for the `0.1.2` preview release.

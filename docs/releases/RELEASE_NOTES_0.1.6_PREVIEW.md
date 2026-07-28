@@ -2,12 +2,10 @@
 
 Chiselo is a native macOS app for high-fidelity refinement and delivery of existing HTML files.
 
-中文：Chiselo 是一款 HTML 精修与交付工具。打开已有 HTML 页面/文档，精修文字、图片、表格、模块和版式，交付前预检问题，然后导出干净 HTML、高保真 PDF 或尽量可编辑的 PPTX。
-
 ## What Changed In 0.1.6
 
 - Added dynamic-content compatibility diagnostics for script-rendered and complex HTML.
-- Added `转为可编辑版` Layout IR v1 for turning rendered HTML into deterministic editable text, image, shape, pseudo-element, and whole-object fallback elements.
+- Added `Convert to Editable Version` Layout IR v1 for turning rendered HTML into deterministic editable text, image, shape, pseudo-element, and whole-object fallback elements.
 - Shows a quality summary for editable versions, including editable text, replaceable images, adjustable shapes, whole-object fallbacks, and PPTX editability.
 - Adds deterministic module grouping metadata so captured card, section, table, and visual-module objects can be recognized together.
 - Lets captured modules be selected as a group from the Inspector, then moved, nudged, aligned, snapped, duplicated, deleted, locked, or refined internally with same-width, same-height, and equal-spacing commands.
@@ -21,7 +19,7 @@ Chiselo is a native macOS app for high-fidelity refinement and delivery of exist
 - Detects runtime roots, scripts, embedded pages, canvas regions, shadow components, external runtime resources, and transparent selection blockers.
 - Makes dynamically inserted titles, images, tables, and modules join the editing and delivery-check pipeline after import.
 - Temporarily lets empty transparent hit layers pass through clicks inside the editor so the real visible object underneath can be selected.
-- Adds dynamic-content risk rows, issue icons, export scoring penalties, and guidance for when `转为可编辑版` is the safer precision-editing path.
+- Adds dynamic-content risk rows, issue icons, export scoring penalties, and guidance for when `Convert to Editable Version` is the safer precision-editing path.
 - Keeps exported HTML clean by stripping Chiselo editing markers before delivery.
 - Updates packaging to `0.1.6`.
 
@@ -41,7 +39,7 @@ Commercial use is not allowed under the included license.
 - Select visible page objects directly on the canvas.
 - Edit text in place.
 - Move, resize, align, duplicate, delete, and adjust layer order.
-- Select captured cards/modules as one group after `转为可编辑版` for safer second-pass layout changes and internal spacing cleanup.
+- Select captured cards/modules as one group after `Convert to Editable Version` for safer second-pass layout changes and internal spacing cleanup.
 - Replace images with embedded PNG/JPG/GIF/SVG/WebP data URLs.
 - Edit tables, including safer handling for `rowspan` and `colspan`.
 - Show page/canvas boundaries, center lines, ruler ticks, snapping guides, and distribution controls.
@@ -59,7 +57,7 @@ Commercial use is not allowed under the included license.
 3. Drag `Chiselo.app` to `Applications`.
 4. Launch Chiselo.
 
-This preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, read the included `首次打开帮助.txt`.
+This preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, read the included `First Launch Help.txt`.
 
 For GitHub Releases, publish the final downloadable build as a normal release instead of a pre-release when the website button should always resolve to the newest asset through `/releases/latest`.
 

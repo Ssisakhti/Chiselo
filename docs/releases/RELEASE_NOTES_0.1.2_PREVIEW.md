@@ -2,14 +2,12 @@
 
 Chiselo is a native macOS app for refining and delivering HTML pages and visual documents.
 
-中文：Chiselo 是一款 HTML 精修与交付工具。打开现有或生成的 HTML 页面/文档，调整文字、图片、表格、模块和版式，然后导出可交付文件。
-
 Creator note: Chiselo was built through vibe coding by a humanities-background creator who does not come from a programming background. Thanks to Codex and GPT for making this kind of software exploration possible.
 
 ## What Changed In 0.1.2
 
 - Added clearer first-install guidance for new macOS users.
-- Included `首次打开帮助.txt` inside the DMG package.
+- Included `First Launch Help.txt` inside the DMG package.
 - Added specific solutions for `Open Anyway`, Finder right-click `Open`, and “move to trash / damaged” alerts.
 - Documented the quarantine-removal command for trusted downloads.
 
@@ -43,7 +41,7 @@ Commercial use is not allowed under the included license.
 3. Drag `Chiselo.app` to `Applications`.
 4. Launch Chiselo.
 
-This preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, read the included `首次打开帮助.txt`.
+This preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, read the included `First Launch Help.txt`.
 
 ## Known Limitations
 

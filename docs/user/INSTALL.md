@@ -17,7 +17,7 @@ Current preview builds are ad-hoc signed and not notarized. If macOS blocks the 
 xattr -dr com.apple.quarantine /Applications/Chiselo.app
 ```
 
-The DMG also includes `首次打开帮助.txt` with these steps.
+The DMG also includes `First Launch Help.txt` with these steps.
 
 ## Build Locally
 

@@ -37,7 +37,7 @@ Strongly aligned:
 - Object-level visual diff against the opened HTML for reviewing changed text, images, geometry, and key styles before delivery, including next/previous changed-object navigation in export preflight.
 - PPTX editable-object report for estimating text, image, shape, review, and whole-object fallback counts before export, with click-through targeting, next/previous review navigation, and preflight repair actions.
 - Safe backups and history restore.
-- `转为可编辑版` for converting the current rendering into stable editable objects.
+- `Convert to Editable Version` for converting the current rendering into stable editable objects.
 - Deterministic module grouping, module-group movement, and module-internal size/spacing cleanup.
 
 Needs continued polishing:

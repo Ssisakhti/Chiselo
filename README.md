@@ -9,7 +9,7 @@
 
 Chiselo is a native macOS app for high-fidelity refinement and delivery of existing HTML files.
 
-中文定位：Chiselo 是一款 HTML 精修与交付工具。打开已有 HTML 页面/文档，像整理交付稿一样精修文字、图片、表格、模块和版式，然后导出干净 HTML、高保真 PDF 或尽量可编辑的 PPTX。
+Open an existing HTML page or document, refine its text, images, tables, modules, and layout the way you would polish a deliverable, then export clean HTML, high-fidelity PDF, or the most editable PPTX it can produce.
 
 Chiselo starts from an existing HTML document. It is a finishing and delivery workflow, not a project authoring environment. The core promise is simple:
 
@@ -27,7 +27,7 @@ Download the latest packaged DMG from GitHub Releases after each published build
 - [0.1.11 Preview Notes](docs/releases/RELEASE_NOTES_0.1.11_PREVIEW.md)
 - [Release Guide](docs/dev/RELEASE.md)
 
-The preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, the DMG includes `首次打开帮助.txt` with step-by-step fixes for `Open Anyway`, Finder right-click `Open`, and quarantine removal.
+The preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, the DMG includes `First Launch Help.txt` with step-by-step fixes for `Open Anyway`, Finder right-click `Open`, and quarantine removal.
 
 ## Why Chiselo
 

@@ -2,7 +2,7 @@
 
 This guide is written for publishing Chiselo as a public preview without needing the GitHub CLI.
 
-本指南适合第一次发布：不用安装 `gh`，主要使用 GitHub 网页 + 普通 `git` 命令。不要把 GitHub 密码粘进终端。GitHub 现在一般使用浏览器登录、GitHub Desktop，或 Personal Access Token。
+This guide suits a first release: there is no need to install `gh`, and it relies mainly on the GitHub website plus ordinary `git` commands. Do not paste your GitHub password into the terminal. GitHub now expects browser sign-in, GitHub Desktop, or a Personal Access Token.
 
 Official references:
 
