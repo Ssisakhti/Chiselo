@@ -102,7 +102,7 @@ final class PostdocLayoutAdjustmentTest: NSObject, WKNavigationDelegate, WKScrip
                   w: title.w + 18,
                   h: title.h + 2
                 });
-                adjustments.push(change('第一页标题：右移 8px、略放宽，保留副标题空间', titleBefore, editor.getSelection()));
+                adjustments.push(change('Page 1 title: shift right 8px and widen slightly, keeping room for the subtitle', titleBefore, editor.getSelection()));
 
                 let role = select('.sheet[data-page="1"] .role-emphasis');
                 const roleBefore = { ...role };
@@ -114,7 +114,7 @@ final class PostdocLayoutAdjustmentTest: NSObject, WKNavigationDelegate, WKScrip
                   h: role.h + 2,
                   style: { ...(role.style || {}), fontSize: Math.max(16.5, (role.style?.fontSize || 16) + 0.5) }
                 });
-                adjustments.push(change('第一页红色提示：下移并提高字号', roleBefore, editor.getSelection()));
+                adjustments.push(change('Page 1 red callout: move down and increase font size', roleBefore, editor.getSelection()));
 
                 let stat = select('.sheet[data-page="1"] .stats .stat:nth-child(1)');
                 editor.command('selectSameClass');
@@ -128,7 +128,7 @@ final class PostdocLayoutAdjustmentTest: NSObject, WKNavigationDelegate, WKScrip
                   w: statGroup.w,
                   h: statGroup.h
                 });
-                adjustments.push(change('第一页三张待遇卡片：成组选中并整体下移 3px', statBefore, editor.getSelection()));
+                adjustments.push(change('Page 1 three benefit cards: select as a group and move down 3px', statBefore, editor.getSelection()));
 
                 let contact = select('.sheet[data-page="2"] .contact');
                 const contactBefore = { ...contact };
@@ -139,7 +139,7 @@ final class PostdocLayoutAdjustmentTest: NSObject, WKNavigationDelegate, WKScrip
                   w: contact.w + 8,
                   h: contact.h
                 });
-                adjustments.push(change('第二页联系方式模块：上移并微调宽度', contactBefore, editor.getSelection()));
+                adjustments.push(change('Page 2 contact module: move up and fine-tune the width', contactBefore, editor.getSelection()));
 
                 await sleep(120);
                 const exported = editor.exportHTML();

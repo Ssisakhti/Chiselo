@@ -101,7 +101,7 @@ final class DirectHTMLStylesheetWritebackTest: NSObject, WKNavigationDelegate, W
 
           const shared = editor.selectHTML('.shared-card');
           if (!shared) throw new Error('Could not select shared class card.');
-          const sharedWritebackOk = shared.style?.writebackKind === 'inline-style' && shared.style?.writebackTarget === 'style' && String(shared.style?.writebackDetail || '').includes('误改同类对象');
+          const sharedWritebackOk = shared.style?.writebackKind === 'inline-style' && shared.style?.writebackTarget === 'style' && String(shared.style?.writebackDetail || '').includes('altering similar objects');
           editor.updateElement({
             id: shared.id,
             x: shared.x,

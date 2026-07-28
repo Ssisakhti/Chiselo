@@ -83,7 +83,7 @@ final class DirectHTMLSourceSyncTest: NSObject, WKNavigationDelegate, WKScriptMe
           const reselectedSame = reselected && reselected.id === selected.id && String(reselected.sourceSnippet || '').includes('Synced title');
           const nextSource = snippet.replace('Synced title', 'Edited from source').replace('real source', 'source editor');
           const warningPreview = editor.validateSelectedHTMLSource(nextSource.replace('class="source-card"', 'class="source-card changed-card"').replace('<article', '<section').replace('</article>', '</section>'));
-          const warningDetected = warningPreview.ok === true && Array.isArray(warningPreview.warnings) && warningPreview.warnings.some(item => String(item).includes('顶层标签')) && warningPreview.warnings.some(item => String(item).includes('class'));
+          const warningDetected = warningPreview.ok === true && Array.isArray(warningPreview.warnings) && warningPreview.warnings.some(item => String(item).includes('top-level tag')) && warningPreview.warnings.some(item => String(item).includes('class'));
           const structureShiftSource = [
             '<article id="sourceTarget" class="source-card">',
             '  <header>',

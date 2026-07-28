@@ -59,8 +59,8 @@ final class DirectHTMLResponsiveChangeReviewTest: NSObject, WKNavigationDelegate
           const item = items[0] || {};
           const matchedTarget = targetIds.includes(target.id) && diagnostics.responsiveChangeElementId === target.id;
           const hasBreakpointWidths = [619, 620, 621].every(width => reviewWidths.includes(width));
-          const hasStructuredReason = String(item.responsiveReason || '').includes('布局') && String(item.responsiveLayoutKind || '').includes('布局') && Array.isArray(item.responsiveReviewWidths) && item.responsiveReviewWidths.includes(620);
-          const hasReason = String(item.detail || '').includes('断点附近宽度') && String(item.afterValue || '').includes('布局') && hasStructuredReason && hasBreakpointWidths;
+          const hasStructuredReason = String(item.responsiveReason || '').includes('layout') && String(item.responsiveLayoutKind || '').includes('layout') && Array.isArray(item.responsiveReviewWidths) && item.responsiveReviewWidths.includes(620);
+          const hasReason = String(item.detail || '').includes('widths near breakpoints') && String(item.afterValue || '').includes('layout') && hasStructuredReason && hasBreakpointWidths;
 
           const appMain = editor.selectHTML('.mock-main');
           if (!appMain) throw new Error('Could not select mock app main pane.');

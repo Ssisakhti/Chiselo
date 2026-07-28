@@ -129,10 +129,10 @@ final class VisualChangeRevertTest: NSObject, WKNavigationDelegate, WKScriptMess
           await sleep(220);
           diagnostics = editor.getImportDiagnostics();
           const ruleItem = (diagnostics.visualChangeItems || []).find(item => item.kind === '样式' && item.elementId === ruleTarget.id);
-          if (!ruleItem || !ruleItem.changeKey || ruleItem.canRevert !== true || !String(ruleItem.detail || '').includes('样式表规则')) {
+          if (!ruleItem || !ruleItem.changeKey || ruleItem.canRevert !== true || !String(ruleItem.detail || '').includes('stylesheet rule')) {
             throw new Error(`Expected revertable stylesheet-rule visual change, got ${JSON.stringify(diagnostics.visualChangeItems)}`);
           }
-          if (ruleItem.writebackKind !== 'stylesheet-rule' || ruleItem.writebackLabel !== 'CSS 规则' || ruleItem.writebackTarget !== '.rule-card') {
+          if (ruleItem.writebackKind !== 'stylesheet-rule' || ruleItem.writebackLabel !== 'CSS rule' || ruleItem.writebackTarget !== '.rule-card') {
             throw new Error(`Expected stylesheet-rule writeback metadata, got ${JSON.stringify(ruleItem)}`);
           }
           if ((diagnostics.stylesheetRuleWritebackCount || 0) < 1) {

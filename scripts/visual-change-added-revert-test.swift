@@ -70,7 +70,7 @@ final class VisualChangeAddedRevertTest: NSObject, WKNavigationDelegate, WKScrip
           if (!addedItem || !addedItem.changeKey || !addedItem.elementId) {
             throw new Error(`Expected revertable added-object visual change, got ${JSON.stringify(diagnostics.visualChangeItems)}`);
           }
-          if (!String(addedItem.detail || '').includes('移除')) {
+          if (!String(addedItem.detail || '').includes('remove')) {
             throw new Error(`Expected added-object detail to explain removal, got ${JSON.stringify(addedItem)}`);
           }
 

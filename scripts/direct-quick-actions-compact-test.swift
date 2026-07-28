@@ -130,9 +130,9 @@ final class DirectQuickActionsCompactTest: NSObject, WKNavigationDelegate, WKScr
                   throw new Error('Quick actions path did not include the wrapping header.');
                 }
                 const parentAction = [...quickMenu.querySelectorAll('.quick-action')]
-                  .find((button) => button.textContent === '父级');
+                  .find((button) => button.textContent === 'Parent');
                 const childrenAction = [...quickMenu.querySelectorAll('.quick-action')]
-                  .find((button) => button.textContent === '子组');
+                  .find((button) => button.textContent === 'Children');
                 if (!parentAction) {
                   throw new Error('Quick actions menu did not include parent selection.');
                 }
@@ -164,14 +164,14 @@ final class DirectQuickActionsCompactTest: NSObject, WKNavigationDelegate, WKScr
                 nextQuickToggle.click();
                 await sleep(40);
                 const rebuiltChildrenAction = [...nextQuickMenu.querySelectorAll('.quick-action')]
-                  .find((button) => button.textContent === '子组');
+                  .find((button) => button.textContent === 'Children');
                 if (!rebuiltChildrenAction) {
                   throw new Error('Parent selection menu did not include visible-children selection.');
                 }
                 rebuiltChildrenAction.click();
                 await sleep(80);
                 const childGroupSelection = window.ChiseloEditor.getSelection();
-                if (!childGroupSelection || childGroupSelection.type !== 'html-group' || !childGroupSelection.text.includes('已选中')) {
+                if (!childGroupSelection || childGroupSelection.type !== 'html-group' || !childGroupSelection.text.includes('selected')) {
                   throw new Error(`Visible children quick action did not create an HTML group: ${JSON.stringify(childGroupSelection)}`);
                 }
 
@@ -191,7 +191,7 @@ final class DirectQuickActionsCompactTest: NSObject, WKNavigationDelegate, WKScr
                 siblingQuickToggle.click();
                 await sleep(40);
                 const nextSiblingAction = [...siblingQuickMenu.querySelectorAll('.quick-action')]
-                  .find((button) => button.textContent === '后项');
+                  .find((button) => button.textContent === 'Next');
                 if (!nextSiblingAction) {
                   throw new Error('Quick actions menu did not include next sibling selection.');
                 }
