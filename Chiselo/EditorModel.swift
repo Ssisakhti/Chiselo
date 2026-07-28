@@ -74,9 +74,9 @@ final class EditorModel: ObservableObject {
 
         var title: String {
             switch self {
-            case .clean: return "干净"
-            case .grid: return "细网格"
-            case .dots: return "点阵"
+            case .clean: return "Clean"
+            case .grid: return "Fine Grid"
+            case .dots: return "Dots"
             }
         }
 
@@ -113,7 +113,7 @@ final class EditorModel: ObservableObject {
     @Published var documentMode: String = "deck"
     @Published var selectionPath: String?
     @Published var htmlTree: [HTMLTreeNode] = []
-    @Published var status: String = "正在启动编辑器..."
+    @Published var status: String = "Starting editor..."
     @Published var tabs: [EditorTab] = []
     @Published var activeTabID: UUID?
     @Published var isFileDropTargeted: Bool = false
@@ -160,10 +160,10 @@ final class EditorModel: ObservableObject {
             return warning
         }
         if let backupURL = safety.backupURL {
-            let prefix = safety.backupCreated ? "已自动备份原始文件" : "已找到原始备份"
+            let prefix = safety.backupCreated ? "Original file backed up automatically" : "Existing original backup found"
             return "\(prefix)：\(backupURL.lastPathComponent)"
         }
-        return "应用修改前，建议先备份原始 HTML 文件。"
+        return "Back up the original HTML file before applying changes."
     }
 
     weak var webView: WKWebView?
@@ -517,12 +517,12 @@ final class EditorModel: ObservableObject {
         node.setAttribute("contenteditable", "true");
         node.setAttribute("spellcheck", "true");
       }
-      updateStatus(`可编辑 ${nodes.length} 处文字`);
+      updateStatus(`${nodes.length} text block(s) editable`);
     } else {
-      updateStatus("预览模式");
+      updateStatus("Preview mode");
     }
 
-    if (editButton) editButton.textContent = enabled ? "退出编辑" : "编辑文字";
+    if (editButton) editButton.textContent = enabled ? "Exit Editing" : "Edit Text";
   }
 
   function downloadHTML() {
@@ -537,7 +537,7 @@ final class EditorModel: ObservableObject {
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    updateStatus("已生成下载文件");
+    updateStatus("Download file created");
   }
 
   function saveDraft() {
@@ -546,9 +546,9 @@ final class EditorModel: ObservableObject {
         body: cleanBodyHTML(),
         savedAt: new Date().toISOString()
       }));
-      updateStatus("草稿已保存");
+      updateStatus("Draft saved");
     } catch {
-      updateStatus("浏览器不允许保存草稿");
+      updateStatus("The browser will not allow saving a draft");
     }
   }
 
@@ -556,15 +556,15 @@ final class EditorModel: ObservableObject {
     try {
       const draft = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
       if (!draft?.body) {
-        updateStatus("没有草稿");
+        updateStatus("No draft found");
         return;
       }
       setEditing(false);
       document.body.innerHTML = draft.body;
       installToolbar();
-      updateStatus("草稿已载入");
+      updateStatus("Draft loaded");
     } catch {
-      updateStatus("草稿载入失败");
+      updateStatus("Could not load the draft");
     }
   }
 
@@ -572,7 +572,7 @@ final class EditorModel: ObservableObject {
     setEditing(false);
     document.body.innerHTML = originalBodyHTML;
     installToolbar();
-    updateStatus("已恢复初始");
+    updateStatus("Restored to original");
   }
 
   function button(label, className, action) {
@@ -595,20 +595,20 @@ final class EditorModel: ObservableObject {
 
     const title = document.createElement("div");
     title.className = "chiselo-lite-title";
-    title.textContent = "Chiselo 编辑模式";
+    title.textContent = "Chiselo Editing Mode";
 
     statusNode = document.createElement("div");
     statusNode.className = "chiselo-lite-status";
-    statusNode.textContent = "预览模式";
+    statusNode.textContent = "Preview mode";
 
-    editButton = button("编辑文字", "is-primary", () => setEditing(!isEditing));
+    editButton = button("Edit Text", "is-primary", () => setEditing(!isEditing));
     toolbar.append(
       title,
       editButton,
-      button("保存草稿", "", saveDraft),
-      button("载入草稿", "", loadDraft),
-      button("下载 HTML", "", downloadHTML),
-      button("恢复初始", "is-danger", restoreInitial),
+      button("Save Draft", "", saveDraft),
+      button("Load Draft", "", loadDraft),
+      button("Download HTML", "", downloadHTML),
+      button("Restore Original", "is-danger", restoreInitial),
       statusNode
     );
 
@@ -624,7 +624,7 @@ final class EditorModel: ObservableObject {
 
   document.addEventListener("input", (event) => {
     if (!event.target.closest?.("[data-chiselo-lite-editable]")) return;
-    updateStatus("有未导出的修改");
+    updateStatus("Unsaved changes not yet exported");
   }, true);
 
   document.addEventListener("paste", (event) => {
@@ -633,7 +633,7 @@ final class EditorModel: ObservableObject {
     if (!text) return;
     event.preventDefault();
     insertPlainTextAtSelection(text);
-    updateStatus("有未导出的修改");
+    updateStatus("Unsaved changes not yet exported");
   }, true);
 
   installToolbar();
@@ -654,10 +654,10 @@ final class EditorModel: ObservableObject {
             case "bridgeReady":
                 applyEditorBackdrop()
                 if let activeTabID {
-                    updatePublished(\.status, to: "编辑器已就绪")
+                    updatePublished(\.status, to: "Editor ready")
                     loadTab(id: activeTabID)
                 } else {
-                    updatePublished(\.status, to: "打开项目或拖入 HTML 文件开始")
+                    updatePublished(\.status, to: "Open a project or drop in an HTML file to start")
                 }
 
             case "selectionChanged":
@@ -671,9 +671,9 @@ final class EditorModel: ObservableObject {
                 updatePublished(\.selectedElement, to: message.element)
                 updatePublished(\.selectionPath, to: message.path)
                 if let element = message.element {
-                    updatePublished(\.status, to: "已选中 \(element.semanticLabel ?? element.tagName ?? element.type)")
+                    updatePublished(\.status, to: "Selected \(element.semanticLabel ?? element.tagName ?? element.type)")
                 } else {
-                    updatePublished(\.status, to: "未选中对象")
+                    updatePublished(\.status, to: "No object selected")
                 }
 
             case "deckChanged":
@@ -696,7 +696,7 @@ final class EditorModel: ObservableObject {
                 resetHTMLVisualSnapshots()
                 updatePublished(\.documentMode, to: "deck")
                 updatePublished(\.selectedSlideIndex, to: message.slideIndex ?? selectedSlideIndex)
-                updatePublished(\.status, to: "页面已更新")
+                updatePublished(\.status, to: "Page updated")
                 refreshDocumentStats()
 
             case "htmlTreeChanged":
@@ -1015,13 +1015,13 @@ final class EditorModel: ObservableObject {
     func openDroppedURLs(_ urls: [URL]) {
         let openableURLs = urls.filter(canOpenURL)
         guard !openableURLs.isEmpty else {
-            status = "拖入 HTML、HTM、XHTML 或 Chiselo 项目文件即可打开"
+            status = "Drop in an HTML, HTM, XHTML, or Chiselo project file to open it"
             isFileDropTargeted = false
             return
         }
 
         isFileDropTargeted = false
-        status = openableURLs.count == 1 ? "正在打开 \(openableURLs[0].lastPathComponent)..." : "正在打开 \(openableURLs.count) 个文件..."
+        status = openableURLs.count == 1 ? "Opening \(openableURLs[0].lastPathComponent)..." : "Opening \(openableURLs.count) files..."
         captureActiveTabSnapshot { [weak self] in
             guard let self else { return }
 
@@ -1094,35 +1094,35 @@ final class EditorModel: ObservableObject {
         tabSafetyInfo[activeTabID] = safety
 
         let alert = NSAlert()
-        alert.messageText = "修改前请确认原始文件已备份"
+        alert.messageText = "Confirm the original file is backed up before editing"
         if let warning = safety.warning {
-            alert.informativeText = "\(warning)\n\n建议先在 Finder 里复制一份原始 HTML，再继续精修。"
+            alert.informativeText = "\(warning)\n\nCopy the original HTML in Finder before continuing to refine it."
             alert.alertStyle = .warning
         } else if let backupURL = safety.backupURL {
-            let verb = safety.backupCreated ? "已自动创建原始备份" : "已保留已有原始备份"
-            alert.informativeText = "\(verb)：\(backupURL.lastPathComponent)\n\n保存覆盖前还会写入 `.chiselo-history` 版本快照。重要交付文件建议先确认这份备份存在。"
+            let verb = safety.backupCreated ? "Created an original backup automatically" : "Kept the existing original backup"
+            alert.informativeText = "\(verb): \(backupURL.lastPathComponent)\n\nA `.chiselo-history` version snapshot is also written before overwriting on save. For important delivery files, confirm this backup exists first."
             alert.alertStyle = .informational
         } else {
-            alert.informativeText = "当前文件还没有可确认的自动备份。重要 HTML 建议先复制一份原始文件，再继续修改。"
+            alert.informativeText = "There is no confirmed automatic backup for this file yet. For important HTML, copy the original file before continuing to edit."
             alert.alertStyle = .warning
         }
-        alert.addButton(withTitle: "继续修改")
-        alert.addButton(withTitle: "打开备份位置")
+        alert.addButton(withTitle: "Continue Editing")
+        alert.addButton(withTitle: "Open Backup Location")
 
         let response = alert.runModal()
         if response == .alertSecondButtonReturn, let backupURL = safety.backupURL {
             NSWorkspace.shared.activateFileViewerSelecting([backupURL])
-            status = "已显示原始备份：\(backupURL.lastPathComponent)"
+            status = "Revealed original backup: \(backupURL.lastPathComponent)"
         } else if let backupURL = safety.backupURL {
-            status = "修改前备份已确认：\(backupURL.lastPathComponent)"
+            status = "Pre-edit backup confirmed: \(backupURL.lastPathComponent)"
         } else {
-            status = "请确认已自行备份原始文件"
+            status = "Confirm you have your own backup of the original file"
         }
     }
 
     func saveDeck() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1132,7 +1132,7 @@ final class EditorModel: ObservableObject {
         }
 
         guard let json = deckJSON else {
-            status = "当前没有可保存的固定画布项目"
+            status = "There is no fixed-canvas project to save"
             return
         }
 
@@ -1151,30 +1151,30 @@ final class EditorModel: ObservableObject {
 
     func revealSafetyFolder() {
         guard let openedURL else {
-            status = "当前文件还没有保存位置"
+            status = "This file does not have a save location yet"
             return
         }
 
         let historyDirectory = safeFileHistory.historyDirectory(for: openedURL)
         if FileManager.default.fileExists(atPath: historyDirectory.path) {
             NSWorkspace.shared.open(historyDirectory)
-            status = "已打开版本快照目录"
+            status = "Opened the version snapshot folder"
             return
         }
 
         NSWorkspace.shared.activateFileViewerSelecting([openedURL])
-        status = "还没有保存快照，已显示当前文件位置"
+        status = "No snapshot saved yet. Revealed the current file location"
     }
 
     func presentHistoryBrowser() {
         guard openedURL != nil else {
-            status = "当前文件还没有保存位置"
+            status = "This file does not have a save location yet"
             return
         }
 
         refreshHistorySnapshots()
         isHistoryBrowserPresented = true
-        status = historySnapshots.isEmpty ? "没有找到可恢复的版本快照" : "已打开版本历史"
+        status = historySnapshots.isEmpty ? "No restorable version snapshots found" : "Opened Version History"
     }
 
     func refreshHistorySnapshots() {
@@ -1196,14 +1196,14 @@ final class EditorModel: ObservableObject {
         } catch {
             historySnapshots = []
             selectedHistorySnapshotID = nil
-            status = "读取版本历史失败：\(error.localizedDescription)"
+            status = "Could not read Version History: \(error.localizedDescription)"
         }
     }
 
     func restoreSelectedHistorySnapshot() {
         guard let selectedHistorySnapshotID,
               let snapshot = historySnapshots.first(where: { $0.id == selectedHistorySnapshotID }) else {
-            status = "请选择一个版本快照"
+            status = "Select a version snapshot"
             return
         }
 
@@ -1212,44 +1212,44 @@ final class EditorModel: ObservableObject {
 
     func restoreLatestSnapshot() {
         guard let openedURL else {
-            status = "当前文件还没有保存位置"
+            status = "This file does not have a save location yet"
             return
         }
 
         do {
             guard let snapshotURL = try safeFileHistory.latestVersionSnapshot(for: openedURL) else {
-                status = "没有找到可恢复的版本快照"
+                status = "No restorable version snapshots found"
                 return
             }
 
             restoreSnapshot(at: snapshotURL)
         } catch {
-            status = "恢复失败：\(error.localizedDescription)"
+            status = "Restore failed: \(error.localizedDescription)"
         }
     }
 
     private func restoreSnapshot(at snapshotURL: URL) {
         guard let openedURL else {
-            status = "当前文件还没有保存位置"
+            status = "This file does not have a save location yet"
             return
         }
 
         do {
             guard FileManager.default.fileExists(atPath: snapshotURL.path) else {
-                status = "快照不存在或已被移动"
+                status = "The snapshot no longer exists or has been moved"
                 refreshHistorySnapshots()
                 return
             }
 
             let alert = NSAlert()
-            alert.messageText = "恢复这个 Chiselo 快照？"
-            alert.informativeText = "将用 \(snapshotURL.lastPathComponent) 覆盖当前文件。覆盖前会先为当前文件再保存一份快照。"
+            alert.messageText = "Restore this Chiselo snapshot?"
+            alert.informativeText = "This will overwrite the current file with \(snapshotURL.lastPathComponent). A snapshot of the current file is saved first."
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "恢复")
-            alert.addButton(withTitle: "取消")
+            alert.addButton(withTitle: "Restore")
+            alert.addButton(withTitle: "Cancel")
 
             guard alert.runModal() == .alertFirstButtonReturn else {
-                status = "已取消恢复"
+                status = "Restore cancelled"
                 return
             }
 
@@ -1270,15 +1270,15 @@ final class EditorModel: ObservableObject {
             }
 
             refreshHistorySnapshots()
-            status = "已恢复 \(snapshotURL.lastPathComponent)"
+            status = "Restored \(snapshotURL.lastPathComponent)"
         } catch {
-            status = "恢复失败：\(error.localizedDescription)"
+            status = "Restore failed: \(error.localizedDescription)"
         }
     }
 
     func exportHTML() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1289,7 +1289,7 @@ final class EditorModel: ObservableObject {
 
     func exportEditableHTML() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1302,7 +1302,7 @@ final class EditorModel: ObservableObject {
 
     func exportPDF() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1316,7 +1316,7 @@ final class EditorModel: ObservableObject {
 
     func exportPPTX() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1330,28 +1330,28 @@ final class EditorModel: ObservableObject {
 
     func presentExportPreflight() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
         refreshHTMLDiagnostics()
         refreshHTMLVisualReviewSnapshot()
         isExportPreflightPresented = true
-        status = "已打开导出预检"
+        status = "Opened Export Preflight"
     }
 
     func freezeCurrentHTMLLayout() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
         guard documentMode == "html" else {
-            status = "转为可编辑版适用于 HTML 文档模式"
+            status = "Convert to Editable Version only applies in HTML document mode"
             return
         }
 
-        status = "正在转换可编辑版..."
+        status = "Converting to Editable Version..."
 
         exportCurrentHTML { [weak self] html in
             guard let self else { return }
@@ -1364,14 +1364,14 @@ final class EditorModel: ObservableObject {
             }
 
             guard let data = html.data(using: .utf8) else {
-                self.status = "转换可编辑版失败：无法编码 HTML"
+                self.status = "Convert to Editable Version failed: could not encode the HTML"
                 return
             }
 
             let base64 = data.base64EncodedString()
             let baseHref = self.openedURL?.deletingLastPathComponent().absoluteString ?? ""
             guard let baseLiteral = self.jsStringLiteral(baseHref) else {
-                self.status = "转换可编辑版失败：无法解析资源路径"
+                self.status = "Convert to Editable Version failed: could not resolve the resource path"
                 return
             }
 
@@ -1385,12 +1385,12 @@ final class EditorModel: ObservableObject {
                     guard let self else { return }
 
                     if let error {
-                        self.status = "转换可编辑版失败：\(error.localizedDescription)"
+                        self.status = "Convert to Editable Version failed: \(error.localizedDescription)"
                         return
                     }
 
                     guard let json = result as? String, !json.isEmpty else {
-                        self.status = "转换可编辑版失败：没有可编辑对象结构"
+                        self.status = "Convert to Editable Version failed: no editable object structure"
                         return
                     }
 
@@ -1400,7 +1400,7 @@ final class EditorModel: ObservableObject {
                     self.activeTabID = id
                     self.openedURL = nil
                     self.loadDeckJSON(json)
-                    self.status = "已转换为可编辑版：\(title)"
+                    self.status = "Converted to Editable Version: \(title)"
                 }
             }
         }
@@ -1408,7 +1408,7 @@ final class EditorModel: ObservableObject {
 
     private func exportCurrentHTML(completion: @escaping (String) -> Void) {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1487,12 +1487,12 @@ final class EditorModel: ObservableObject {
 
     func replaceSelectedImage() {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
         guard documentMode == "html" else {
-            status = "图片替换适用于 HTML 文档模式"
+            status = "Image replacement only applies in HTML document mode"
             return
         }
 
@@ -1532,7 +1532,7 @@ final class EditorModel: ObservableObject {
 
     func editorCommand(_ command: String) {
         guard hasOpenDocument else {
-            status = "请先打开项目或拖入 HTML 文件"
+            status = "Open a project or drop in an HTML file first"
             return
         }
 
@@ -1580,12 +1580,12 @@ final class EditorModel: ObservableObject {
 
     func applySelectedHTMLSource(_ html: String) {
         guard hasOpenDocument, documentMode == "html" else {
-            status = "请先打开 HTML 文件"
+            status = "Open an HTML file first"
             return
         }
 
         guard let literal = jsStringLiteral(html) else {
-            status = "源码片段包含无法提交的字符"
+            status = "The source snippet contains characters that cannot be submitted"
             return
         }
 
@@ -1595,7 +1595,7 @@ final class EditorModel: ObservableObject {
                 guard let self else { return }
 
                 if let error {
-                    self.status = "源码片段应用失败：\(error.localizedDescription)"
+                    self.status = "Could not apply the source snippet: \(error.localizedDescription)"
                     return
                 }
 
@@ -1603,7 +1603,7 @@ final class EditorModel: ObservableObject {
                       json != "null",
                       let data = json.data(using: .utf8),
                       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    self.status = "源码片段应用失败：编辑器未返回结果"
+                    self.status = "Could not apply the source snippet: the editor returned no result"
                     return
                 }
 
@@ -1614,9 +1614,9 @@ final class EditorModel: ObservableObject {
                     }
                     self.updatePublished(\.sourceDraftMappingSummary, to: nil)
                     self.refreshHTMLDiagnostics()
-                    self.status = "已应用源码片段，可用撤销恢复"
+                    self.status = "Source snippet applied. Use Undo to revert"
                 } else {
-                    self.status = object["reason"] as? String ?? "源码片段应用失败"
+                    self.status = object["reason"] as? String ?? "Could not apply the source snippet"
                 }
             }
         }
@@ -1673,7 +1673,7 @@ final class EditorModel: ObservableObject {
 
     func revertHTMLVisualChange(changeKey: String) {
         guard hasOpenDocument, documentMode == "html" else {
-            status = "请先打开 HTML 文件"
+            status = "Open an HTML file first"
             return
         }
 
@@ -1684,7 +1684,7 @@ final class EditorModel: ObservableObject {
                 guard let self else { return }
 
                 if let error {
-                    self.status = "视觉变更回退失败：\(error.localizedDescription)"
+                    self.status = "Could not revert the visual change: \(error.localizedDescription)"
                     return
                 }
 
@@ -1692,16 +1692,16 @@ final class EditorModel: ObservableObject {
                       json != "null",
                       let data = json.data(using: .utf8),
                       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    self.status = "视觉变更回退失败：编辑器未返回结果"
+                    self.status = "Could not revert the visual change: the editor returned no result"
                     return
                 }
 
                 if (object["ok"] as? Bool) == true {
-                    self.status = "已回退此处视觉变更，可用撤销恢复"
+                    self.status = "Reverted this visual change. Use Undo to restore it"
                     self.refreshHTMLDiagnostics()
                     self.refreshHTMLVisualReviewSnapshot()
                 } else {
-                    self.status = object["reason"] as? String ?? "这处变化不能安全一键回退"
+                    self.status = object["reason"] as? String ?? "This change cannot be safely reverted in one step"
                 }
             }
         }
@@ -1715,7 +1715,7 @@ final class EditorModel: ObservableObject {
                 guard let self else { return }
 
                 if let error {
-                    self.status = "预检刷新失败：\(error.localizedDescription)"
+                    self.status = "Could not refresh preflight: \(error.localizedDescription)"
                     return
                 }
 
@@ -1764,7 +1764,7 @@ final class EditorModel: ObservableObject {
 
                 if let error {
                     self.isCapturingHTMLVisualSnapshot = false
-                    self.status = "截图复核捕获失败：\(error.localizedDescription)"
+                    self.status = "Could not capture the review screenshot: \(error.localizedDescription)"
                     completion(nil)
                     return
                 }
@@ -1842,7 +1842,7 @@ final class EditorModel: ObservableObject {
                 Task { @MainActor in
                     guard let self, let webView else { return }
                     if let error {
-                        self.status = "截图复核捕获失败：\(error.localizedDescription)"
+                        self.status = "Could not capture the review screenshot: \(error.localizedDescription)"
                         finish(nil)
                         return
                     }
@@ -1875,7 +1875,7 @@ final class EditorModel: ObservableObject {
                         Task { @MainActor in
                             guard let self else { return }
                             if let error {
-                                self.status = "截图复核捕获失败：\(error.localizedDescription)"
+                                self.status = "Could not capture the review screenshot: \(error.localizedDescription)"
                                 finish(nil)
                                 return
                             }
@@ -1925,7 +1925,7 @@ final class EditorModel: ObservableObject {
         webView.evaluateJavaScript("window.ChiseloEditor?.restoreVisualReviewSnapshot?.(\(json));") { [weak self] _, error in
             Task { @MainActor in
                 if let error {
-                    self?.status = "截图视角恢复失败：\(error.localizedDescription)"
+                    self?.status = "Could not restore the screenshot viewport: \(error.localizedDescription)"
                 }
                 completion()
             }
@@ -2097,11 +2097,11 @@ final class EditorModel: ObservableObject {
             htmlTree = []
             htmlDiagnostics = .empty
             refreshDocumentStats()
-            status = "画布精修：\(openedURL?.lastPathComponent ?? "未命名")"
+            status = "Canvas refine: \(openedURL?.lastPathComponent ?? "Untitled")"
             let base64 = data.base64EncodedString()
             runJavaScript("window.ChiseloEditor?.loadDeckFromBase64('\(base64)');")
         } catch {
-            status = "Chiselo 项目无效：\(error.localizedDescription)"
+            status = "Invalid Chiselo project: \(error.localizedDescription)"
         }
     }
 
@@ -2117,7 +2117,7 @@ final class EditorModel: ObservableObject {
         htmlTree = []
         htmlDiagnostics = .empty
         refreshDocumentStats()
-        status = "HTML 文档模式：\(url?.lastPathComponent ?? "未命名 HTML")"
+        status = "HTML document mode: \(url?.lastPathComponent ?? "Untitled HTML")"
         let base64 = data.base64EncodedString()
         let baseHref = url?.deletingLastPathComponent().absoluteString ?? ""
         guard let baseLiteral = jsStringLiteral(baseHref) else { return }
@@ -2191,7 +2191,7 @@ final class EditorModel: ObservableObject {
                         self.presentExportPreflight()
                         return
                     case .cancel:
-                        self.status = "已取消保存"
+                        self.status = "Save cancelled"
                         return
                     }
                 }
@@ -2245,12 +2245,12 @@ final class EditorModel: ObservableObject {
 
         let safety = activeTabID.flatMap { tabSafetyInfo[$0] }
         let alert = NSAlert()
-        alert.messageText = "保存前复核这次 HTML 修改？"
+        alert.messageText = "Review these HTML changes before saving?"
         alert.informativeText = saveReviewSummary(url: url, diagnostics: diagnostics, safety: safety)
         alert.alertStyle = issueCount > 0 ? .warning : .informational
-        alert.addButton(withTitle: "继续保存")
-        alert.addButton(withTitle: "查看复核")
-        alert.addButton(withTitle: "取消")
+        alert.addButton(withTitle: "Continue Saving")
+        alert.addButton(withTitle: "Open Review")
+        alert.addButton(withTitle: "Cancel")
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
@@ -2265,11 +2265,11 @@ final class EditorModel: ObservableObject {
     private func saveReviewSummary(url: URL, diagnostics: HTMLDiagnostics, safety: OpenTabSafetyInfo?) -> String {
         let backupLine: String
         if let warning = safety?.warning {
-            backupLine = "原始备份：\(warning)"
+            backupLine = "Original backup: \(warning)"
         } else if let backupURL = safety?.backupURL {
-            backupLine = "原始备份：已准备 \(backupURL.lastPathComponent)"
+            backupLine = "Original backup: ready at \(backupURL.lastPathComponent)"
         } else {
-            backupLine = "原始备份：未找到自动备份，建议确认已有原始文件副本"
+            backupLine = "Original backup: no automatic backup found. Confirm you have a copy of the original file"
         }
 
         let visualChangeCount = diagnostics.visualChangeCount ?? 0
@@ -2277,27 +2277,27 @@ final class EditorModel: ObservableObject {
         let previewKinds = saveReviewVisualChangeKinds(diagnostics)
         let responsiveWidthText = saveReviewResponsiveWidths(diagnostics)
         let issueLine = diagnostics.issueCount > 0
-            ? "预检问题：\(diagnostics.issueCount) 项需要处理"
-            : "预检问题：未发现阻断保存的问题"
+            ? "Preflight issues: \(diagnostics.issueCount) need attention"
+            : "Preflight issues: nothing blocking the save"
         let warningLine = diagnostics.warningCount > 0
-            ? "复核提示：\(diagnostics.warningCount) 项建议查看"
-            : "复核提示：暂无额外风险"
+            ? "Review notes: \(diagnostics.warningCount) worth a look"
+            : "Review notes: no additional risks"
         let changeLine = visualChangeCount > 0
-            ? "本次变更：\(visualChangeCount) 个对象发生变化，\(locatedCount) 个可定位\(previewKinds.isEmpty ? "" : "，主要是 \(previewKinds)")\(saveReviewRevertableSuffix(diagnostics))"
-            : "本次变更：未检测到明显对象级视觉变化"
+            ? "Changes: \(visualChangeCount) object(s) changed, \(locatedCount) locatable\(previewKinds.isEmpty ? "" : " — mostly \(previewKinds)")\(saveReviewRevertableSuffix(diagnostics))"
+            : "Changes: no significant object-level visual changes detected"
         let responsiveLine: String?
         if (diagnostics.responsiveChangeCount ?? 0) > 0 {
-            responsiveLine = "多宽度复核：\(diagnostics.responsiveChangeCount ?? 0) 个已修改对象受响应式布局影响，保存前建议检查\(responsiveWidthText)"
+            responsiveLine = "Multi-width review: \(diagnostics.responsiveChangeCount ?? 0) changed object(s) are affected by responsive layout. Check \(responsiveWidthText) before saving"
         } else if (diagnostics.responsiveLayoutRiskCount ?? 0) > 0 {
-            responsiveLine = "多宽度复核：\(diagnostics.responsiveRuleCount ?? 0) 条响应式规则或 \(diagnostics.responsiveLayoutRiskCount ?? 0) 个弹性/网格对象，保存后建议检查\(responsiveWidthText)"
+            responsiveLine = "Multi-width review: \(diagnostics.responsiveRuleCount ?? 0) responsive rule(s) or \(diagnostics.responsiveLayoutRiskCount ?? 0) flex/grid object(s). Check \(responsiveWidthText) after saving"
         } else {
             responsiveLine = nil
         }
-        let cleanlinessLine = "源码洁净度：\(diagnostics.sourceCleanlinessPercent)%\(diagnostics.cleanExport ? "，未检测到编辑器临时标记" : "，仍有 \(diagnostics.exportArtifactCount ?? 0) 处临时标记需处理")"
+        let cleanlinessLine = "Source cleanliness: \(diagnostics.sourceCleanlinessPercent)%\(diagnostics.cleanExport ? " — no editor-only markers detected" : " — \(diagnostics.exportArtifactCount ?? 0) editor-only marker(s) still need attention")"
         let sourceLine = saveReviewSourcePollutionLine(diagnostics)
 
         return [
-            "即将覆盖保存：\(url.lastPathComponent)",
+            "About to overwrite: \(url.lastPathComponent)",
             backupLine,
             changeLine,
             responsiveLine,
@@ -2305,13 +2305,13 @@ final class EditorModel: ObservableObject {
             sourceLine,
             issueLine,
             warningLine,
-            "保存前会再写入 `.chiselo-history` 版本快照。"
+            "A `.chiselo-history` version snapshot is written before saving."
         ].compactMap { $0 }.joined(separator: "\n")
     }
 
     private func saveReviewRevertableSuffix(_ diagnostics: HTMLDiagnostics) -> String {
         let count = diagnostics.revertableVisualChangeCount ?? 0
-        return count > 0 ? "，\(count) 处可一键回退" : ""
+        return count > 0 ? ", \(count) revertable in one step" : ""
     }
 
     private func saveReviewSourcePollutionLine(_ diagnostics: HTMLDiagnostics) -> String? {
@@ -2323,24 +2323,24 @@ final class EditorModel: ObservableObject {
         let ruleTargets = diagnostics.stylesheetRuleWritebackTargets.prefix(3).joined(separator: "、")
         let ruleTargetSuffix = ruleTargets.isEmpty ? "" : "（\(ruleTargets)）"
         if ruleWrites > 0 && inlineChanges == 0 {
-            return "源码写回：\(ruleWrites) 次样式修改已写入本地 CSS 规则\(ruleTargetSuffix)"
+            return "Source writeback: \(ruleWrites) style change(s) written to local CSS rules\(ruleTargetSuffix)"
         }
         if ruleWrites > 0 && inlineChanges > 0 {
-            return "源码写回：\(ruleWrites) 次写入 CSS 规则\(ruleTargetSuffix)，\(inlineChanges) 个对象写入 inline style"
+            return "Source writeback: \(ruleWrites) write(s) to CSS rules\(ruleTargetSuffix), \(inlineChanges) object(s) written to inline style"
         }
         if inlineChanges > 0 && stylesheets > 0 {
-            return "源码写回：\(inlineChanges) 个对象改动 inline style；原稿含 \(stylesheets) 个样式表，建议保存前抽查源码"
+            return "Source writeback: \(inlineChanges) object(s) changed inline style; the original has \(stylesheets) stylesheet(s), so spot-check the source before saving"
         }
         if externalAffectedChanges > 0 {
-            return "样式表复核：\(externalAffectedChanges) 个已修改对象可能受 \(externalSheets) 个外部样式表影响，建议保存前复核宽度和 class 效果"
+            return "Stylesheet review: \(externalAffectedChanges) changed object(s) may be affected by \(externalSheets) external stylesheet(s). Review widths and class effects before saving"
         }
         return nil
     }
 
     private func saveReviewResponsiveWidths(_ diagnostics: HTMLDiagnostics) -> String {
         let widths = (diagnostics.responsiveReviewWidths ?? []).filter { $0 > 0 }.prefix(4)
-        guard !widths.isEmpty else { return "窄屏和宽屏" }
-        return "断点附近宽度 \(widths.map { "\($0)" }.joined(separator: " / "))px"
+        guard !widths.isEmpty else { return "narrow and wide widths" }
+        return "widths near breakpoints \(widths.map { "\($0)" }.joined(separator: " / "))px"
     }
 
     private func saveReviewVisualChangeTargetIds(_ diagnostics: HTMLDiagnostics) -> [String] {
@@ -2367,8 +2367,8 @@ final class EditorModel: ObservableObject {
                 return left.value > right.value
             }
             .prefix(3)
-            .map { "\($0.key) \($0.value)" }
-            .joined(separator: "、")
+            .map { "\(VisualKindLabel.english($0.key)) \($0.value)" }
+            .joined(separator: ", ")
     }
 
     private func chooseSaveURL(defaultName: String, contentTypes: [UTType]) -> URL? {
@@ -2496,7 +2496,7 @@ final class EditorModel: ObservableObject {
         resetEditorHistoryState()
         resetHTMLVisualSnapshots()
         refreshDocumentStats()
-        status = "打开项目或拖入 HTML 文件开始"
+        status = "Open a project or drop in an HTML file to start"
     }
 
     private func loadTab(id: UUID) {
@@ -2567,7 +2567,7 @@ final class EditorModel: ObservableObject {
                     safety.backupCreated = backup?.created == true
                     lastBackupURL = backup?.url
                 } catch {
-                    let message = "安全备份失败：\(payload.url.lastPathComponent) \(error.localizedDescription)"
+                    let message = "Safe backup failed: \(payload.url.lastPathComponent) \(error.localizedDescription)"
                     safety.warning = message
                     lastSafetyWarning = message
                 }
@@ -2585,24 +2585,24 @@ final class EditorModel: ObservableObject {
 
         if let lastID {
             loadTab(id: lastID)
-            let title = tabs.first(where: { $0.id == lastID })?.title ?? "文件"
+            let title = tabs.first(where: { $0.id == lastID })?.title ?? "the file"
             if results.count == 1, reusedCount == 1, openedCount == 0 {
-                status = "已切换到已打开的 \(title)"
+                status = "Switched to the already open \(title)"
             } else if results.count == 1 {
-                status = "已打开 \(title)"
+                status = "Opened \(title)"
             } else if openedCount == 0, reusedCount > 0 {
-                status = "这些文件已经打开，已切换到 \(title)"
+                status = "Those files are already open. Switched to \(title)"
             } else {
-                status = "已打开 \(openedCount) 个新文件"
+                status = "Opened \(openedCount) new file(s)"
             }
 
             if let lastSafetyWarning {
                 status += " · \(lastSafetyWarning)"
             } else if openedCount > 0, let lastBackupURL {
-                status += " · 已准备原始备份 \(lastBackupURL.lastPathComponent)"
+                status += " · original backup ready at \(lastBackupURL.lastPathComponent)"
             }
         } else {
-            status = lastFailure ?? "没有可打开的文件"
+            status = lastFailure ?? "No files to open"
         }
     }
 
@@ -2630,19 +2630,19 @@ final class EditorModel: ObservableObject {
 
     private func tabTitle(for url: URL) -> String {
         let title = url.lastPathComponent
-        return title.isEmpty ? "未命名" : title
+        return title.isEmpty ? "Untitled" : title
     }
 
     private func frozenLayoutTitle() -> String {
-        let baseTitle = activeTabIndex.flatMap { tabs.indices.contains($0) ? tabs[$0].title : nil } ?? "HTML 文档"
+        let baseTitle = activeTabIndex.flatMap { tabs.indices.contains($0) ? tabs[$0].title : nil } ?? "HTML Document"
         let root = baseTitle
-            .replacingOccurrences(of: " - 冻结版式", with: "")
-            .replacingOccurrences(of: " - 可编辑版", with: "")
-        var title = "\(root) - 可编辑版"
+            .replacingOccurrences(of: " - Frozen Layout", with: "")
+            .replacingOccurrences(of: " - Editable Version", with: "")
+        var title = "\(root) - Editable Version"
         var suffix = 2
         let existing = Set(tabs.map(\.title))
         while existing.contains(title) {
-            title = "\(root) - 可编辑版 \(suffix)"
+            title = "\(root) - Editable Version \(suffix)"
             suffix += 1
         }
         return title
@@ -2680,7 +2680,7 @@ private func readOpenTabPayload(_ url: URL) -> OpenTabReadResult {
             _ = try JSONDecoder().decode(EditorDeck.self, from: data)
         }
 
-        let title = url.lastPathComponent.isEmpty ? "未命名" : url.lastPathComponent
+        let title = url.lastPathComponent.isEmpty ? "Untitled" : url.lastPathComponent
         return .success(OpenTabPayload(title: title, url: url, mode: mode, content: content))
     } catch {
         return .failure(filename: url.lastPathComponent, message: "Open failed for \(url.lastPathComponent): \(error.localizedDescription)")

@@ -105,7 +105,7 @@
       slides: [
         {
           id: "slide-1",
-          title: "HTML 精修页面",
+          title: "HTML Refine Page",
           elements: [
             {
               id: "title",
@@ -135,7 +135,7 @@
               h: 88,
               rotation: 0,
               z: 19,
-              text: "HTML 精修、交付预检、多格式输出。",
+              text: "HTML refinement, delivery preflight, multi-format output.",
               style: {
                 fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
                 fontSize: 28,
@@ -275,7 +275,7 @@
     const first = elements[0] || null;
     return {
       groupRole: first?.groupRole || "module",
-      groupLabel: first?.groupLabel || "模块"
+      groupLabel: first?.groupLabel || "Module"
     };
   }
 
@@ -289,23 +289,23 @@
       id: `chiselo-deck-group-${groupId}`,
       type: "deck-group",
       tagName: "group",
-      htmlPath: `已选中模块：${meta.groupLabel}`,
+      htmlPath: `Selected module: ${meta.groupLabel}`,
       semanticRole: "module-group",
-      semanticLabel: "模块组",
+      semanticLabel: "Module Group",
       groupId,
       groupRole: meta.groupRole,
       groupLabel: meta.groupLabel,
       sourceKind: "module-group-selection",
       editability: "group-editable",
       fidelity: "native",
-      captureNote: `模块组包含 ${count} 个可编辑对象，可整组移动、对齐和吸附。`,
+      captureNote: `This module group holds ${count} editable object(s) and can be moved, aligned, and snapped as one unit.`,
       x: bounds.x,
       y: bounds.y,
       w: bounds.w,
       h: bounds.h,
       rotation: 0,
       z: 0,
-      text: `已选中模块：${meta.groupLabel}（${count} 个对象）`,
+      text: `Selected module: ${meta.groupLabel} (${count} object(s))`,
       style: null
     };
   }
@@ -393,7 +393,7 @@
       element: selectedElement(),
       slideIndex: currentSlideIndex,
       path: editorMode === "html" && directNodes.length > 1
-        ? (activePath || `已选中 ${directNodes.length} 个对象`)
+        ? (activePath || `${directNodes.length} object(s) selected`)
         : editorMode === "html" && directSelectedNode
           ? (activePath || directNodePath(directSelectedNode))
           : null
@@ -566,14 +566,14 @@
   }
 
   function historyLabel(label) {
-    return String(label || "编辑对象").trim() || "编辑对象";
+    return String(label || "Edit object").trim() || "Edit object";
   }
 
   function historyEntrySnapshot(entry) {
     return typeof entry === "string" ? entry : entry?.snapshot;
   }
 
-  function historyEntryLabel(entry, fallback = "编辑对象") {
+  function historyEntryLabel(entry, fallback = "Edit object") {
     return historyLabel(typeof entry === "string" ? fallback : entry?.label || fallback);
   }
 
@@ -894,7 +894,7 @@
     if (groupSelected) {
       const badge = document.createElement("div");
       badge.className = "group-badge";
-      badge.textContent = element.groupLabel || "模块组";
+      badge.textContent = element.groupLabel || "Module Group";
       selectionBox.appendChild(badge);
     } else {
       for (const handle of handles) {
@@ -990,7 +990,7 @@
     if (shouldDragGroup && deckGroupHasLocked(dragGroupId)) return;
 
     event.preventDefault();
-    pushHistory({ label: "移动对象" });
+    pushHistory({ label: "Move object" });
 
     if (shouldDragGroup) {
       const startRect = deckGroupBounds(dragGroupId);
@@ -1052,7 +1052,7 @@
 
     event.preventDefault();
     event.stopPropagation();
-    pushHistory({ label: "调整大小" });
+    pushHistory({ label: "Resize object" });
 
     const startRect = rectOf(element);
     activeGesture = {
@@ -1173,7 +1173,7 @@
     const elements = deckGroupElements(groupId);
     if (!elements.length || deckGroupHasLocked(groupId)) return false;
 
-    if (options.history !== false) pushHistory({ label: "移动对象", ...(options.historyOptions || {}) });
+    if (options.history !== false) pushHistory({ label: "Move object", ...(options.historyOptions || {}) });
     for (const element of elements) {
       element.x = Math.round((Number(element.x) || 0) + dx);
       element.y = Math.round((Number(element.y) || 0) + dy);
@@ -1197,7 +1197,7 @@
     const scaleX = startBounds.w ? nextBounds.w / startBounds.w : 1;
     const scaleY = startBounds.h ? nextBounds.h / startBounds.h : 1;
 
-    if (options.history !== false) pushHistory({ label: "调整大小", ...(options.historyOptions || {}) });
+    if (options.history !== false) pushHistory({ label: "Resize object", ...(options.historyOptions || {}) });
     for (const element of elements) {
       const startRect = startRectMap.get(element.id) || rectOf(element);
       element.x = Math.round(nextBounds.x + (startRect.x - startBounds.x) * scaleX);
@@ -1239,7 +1239,7 @@
     const anchor = deckGroupAnchorElement(groupId);
     if (!anchor) return false;
 
-    pushHistory({ label: "统一尺寸" });
+    pushHistory({ label: "Match size" });
     for (const element of elements) {
       if (mode === "width") element.w = Math.max(1, Math.round(anchor.w));
       if (mode === "height") element.h = Math.max(1, Math.round(anchor.h));
@@ -1268,7 +1268,7 @@
     const totalSize = sorted.reduce((sum, element) => sum + (horizontal ? element.w : element.h), 0);
     const gap = (end - start - totalSize) / (sorted.length - 1);
 
-    pushHistory({ label: "分布对象" });
+    pushHistory({ label: "Distribute objects" });
     let cursor = start;
     for (const element of sorted) {
       if (horizontal) element.x = Math.round(cursor);
@@ -1325,24 +1325,24 @@
     const activeIds = new Set(Array.isArray(activeId) ? activeId : activeId ? [activeId] : []);
 
     const xCandidates = [
-      { value: 0, label: "页面左边" },
-      { value: canvas.width / 2, label: "页面中线" },
-      { value: canvas.width, label: "页面右边" }
+      { value: 0, label: "page left" },
+      { value: canvas.width / 2, label: "page center" },
+      { value: canvas.width, label: "page right" }
     ];
     const yCandidates = [
-      { value: 0, label: "页面顶部" },
-      { value: canvas.height / 2, label: "页面中线" },
-      { value: canvas.height, label: "页面底部" }
+      { value: 0, label: "page top" },
+      { value: canvas.height / 2, label: "page center" },
+      { value: canvas.height, label: "page bottom" }
     ];
 
     for (const element of currentSlide().elements) {
       if (activeIds.has(element.id)) continue;
-      xCandidates.push({ value: element.x, label: "对象左边" });
-      xCandidates.push({ value: element.x + element.w / 2, label: "对象中线" });
-      xCandidates.push({ value: element.x + element.w, label: "对象右边" });
-      yCandidates.push({ value: element.y, label: "对象顶部" });
-      yCandidates.push({ value: element.y + element.h / 2, label: "对象中线" });
-      yCandidates.push({ value: element.y + element.h, label: "对象底部" });
+      xCandidates.push({ value: element.x, label: "object left" });
+      xCandidates.push({ value: element.x + element.w / 2, label: "object center" });
+      xCandidates.push({ value: element.x + element.w, label: "object right" });
+      yCandidates.push({ value: element.y, label: "object top" });
+      yCandidates.push({ value: element.y + element.h / 2, label: "object center" });
+      yCandidates.push({ value: element.y + element.h, label: "object bottom" });
     }
 
     const xEdges = [
@@ -1515,7 +1515,7 @@
     if (!element || element.locked) return;
 
     selectElement(id);
-    pushHistory({ label: "修改文字" });
+    pushHistory({ label: "Edit text" });
     content.contentEditable = "true";
     content.focus();
     document.execCommand("selectAll", false, null);
@@ -1558,7 +1558,7 @@
     const index = elements.findIndex((element) => element.id === nextElement.id);
     if (index < 0) return;
 
-    pushHistory({ label: "调整对象" });
+    pushHistory({ label: "Adjust object" });
     elements[index] = { ...elements[index], ...nextElement };
     selectedId = nextElement.id;
     clearDeckGroupSelection();
@@ -1747,7 +1747,7 @@
       const groupId = selectedDeckGroupId;
       const ids = new Set(deckGroupElements(groupId).map((element) => element.id));
       if (!ids.size) return;
-      pushHistory({ label: "删除对象" });
+      pushHistory({ label: "Delete object" });
       currentSlide().elements = currentSlide().elements.filter((element) => !ids.has(element.id));
       clearSelection();
       render();
@@ -1755,7 +1755,7 @@
     }
 
     if (!selectedId) return;
-    pushHistory({ label: "删除对象" });
+    pushHistory({ label: "Delete object" });
     currentSlide().elements = currentSlide().elements.filter((element) => element.id !== selectedId);
     clearSelection();
     render();
@@ -1772,7 +1772,7 @@
       const elements = deckGroupElements(groupId);
       if (!elements.length) return;
 
-      pushHistory({ label: "复制对象" });
+      pushHistory({ label: "Duplicate object" });
       const nextGroupId = uniqueDeckGroupId(`${groupId}-copy`);
       const nextZ = Math.max(...currentSlide().elements.map((item) => item.z), 0) + 1;
       const copies = elements.map((element, index) => {
@@ -1795,7 +1795,7 @@
     const element = selectedElement();
     if (!element) return;
 
-    pushHistory({ label: "复制对象" });
+    pushHistory({ label: "Duplicate object" });
     const copy = clone(element);
     copy.id = uniqueDeckElementId(`${element.id}-copy`);
     copy.x = Math.round(copy.x + 18);
@@ -1839,7 +1839,7 @@
     if (isDeckGroupSelection()) {
       const elements = deckGroupElements(selectedDeckGroupId);
       if (!elements.length) return;
-      pushHistory({ label: "调整层级" });
+      pushHistory({ label: "Change layer order" });
       const allElements = currentSlide().elements;
       const zValues = allElements.map((item) => item.z);
       const minZ = Math.min(...zValues);
@@ -1860,7 +1860,7 @@
     const element = selectedElement();
     if (!element) return;
 
-    pushHistory({ label: "调整层级" });
+    pushHistory({ label: "Change layer order" });
     const elements = currentSlide().elements;
     const zValues = elements.map((item) => item.z);
     const minZ = Math.min(...zValues);
@@ -1888,7 +1888,7 @@
       const elements = deckGroupElements(selectedDeckGroupId);
       if (!elements.length) return;
       const nextLocked = !elements.every((element) => element.locked);
-      pushHistory({ label: "锁定对象" });
+      pushHistory({ label: "Lock object" });
       for (const element of elements) element.locked = nextLocked;
       render();
       postSelectionChanged();
@@ -1898,7 +1898,7 @@
     const element = selectedElement();
     if (!element) return;
 
-    pushHistory({ label: "锁定对象" });
+    pushHistory({ label: "Lock object" });
     element.locked = !element.locked;
     render();
     postSelectionChanged();
@@ -1930,7 +1930,7 @@
     const element = selectedElement();
     if (!element || element.locked) return;
 
-    pushHistory({ label: "对齐对象" });
+    pushHistory({ label: "Align objects" });
     const canvas = deck.canvas;
     if (edge === "left") element.x = 0;
     if (edge === "center") element.x = Math.round((canvas.width - element.w) / 2);
@@ -1969,7 +1969,7 @@
     const element = selectedElement();
     if (!element || element.locked) return;
 
-    pushHistory({ label: "适配尺寸" });
+    pushHistory({ label: "Fit size" });
     const canvas = deck.canvas;
     if (mode === "width" || mode === "page") {
       element.x = 0;
@@ -2017,7 +2017,7 @@
 
     const element = selectedElement();
     if (!element || element.locked) return;
-    pushHistory({ label: "吸附网格" });
+    pushHistory({ label: "Snap to grid" });
     element.x = snapNumber(element.x, grid);
     element.y = snapNumber(element.y, grid);
     element.w = Math.max(MIN_SIZE, snapNumber(element.w, grid));
@@ -2034,7 +2034,7 @@
     if (editorMode === "html") {
       const nodes = directSelectionNodes();
       if (!nodes.length) return;
-      pushHistory({ label: "移动对象" });
+      pushHistory({ label: "Move object" });
       for (const node of nodes) {
         const rect = directNodeRect(node);
         rect.x += dx;
@@ -2053,7 +2053,7 @@
 
     const element = selectedElement();
     if (!element || element.locked) return;
-    pushHistory({ label: "移动对象" });
+    pushHistory({ label: "Move object" });
     element.x = Math.round(element.x + dx);
     element.y = Math.round(element.y + dy);
     render();
@@ -2090,9 +2090,9 @@
         id: "chiselo-selection-group",
         type: "html-group",
         tagName: "group",
-        htmlPath: `已选中 ${nodes.length} 个对象`,
+        htmlPath: `${nodes.length} object(s) selected`,
         semanticRole: "selection-group",
-        semanticLabel: "多选对象",
+        semanticLabel: "Multiple Objects",
         layoutMode: directLayoutMode,
         x: rect.x,
         y: rect.y,
@@ -2101,7 +2101,7 @@
         frame,
         rotation: 0,
         z: 0,
-        text: `已选中 ${nodes.length} 个对象`,
+        text: `${nodes.length} object(s) selected`,
         style: null
       };
     }
@@ -2169,7 +2169,7 @@
     const frameNode = directPageFrameNodeFor(node);
     const rect = frameNode ? directNodeRect(frameNode) : directCanvasRect();
     return {
-      label: frameNode ? pageFrameLabel(frameNode, 0, 1) : "画布",
+      label: frameNode ? pageFrameLabel(frameNode, 0, 1) : "Canvas",
       x: rect.x,
       y: rect.y,
       w: rect.w,
@@ -2496,21 +2496,21 @@
 
   function parseSingleHTMLSourceElement(html, doc) {
     const source = String(html || "").trim();
-    if (!source) return { ok: false, reason: "源码片段为空。" };
+    if (!source) return { ok: false, reason: "The source snippet is empty." };
     const template = doc.createElement("template");
     try {
       template.innerHTML = source;
     } catch (error) {
-      return { ok: false, reason: `源码片段无法解析：${error?.message || error}` };
+      return { ok: false, reason: `Could not parse the source snippet: ${error?.message || error}` };
     }
     const elements = [...template.content.children];
-    if (elements.length !== 1) return { ok: false, reason: "源码片段必须只有一个顶层 HTML 对象。" };
+    if (elements.length !== 1) return { ok: false, reason: "The source snippet must contain exactly one top-level HTML object." };
     const extraText = [...template.content.childNodes]
       .filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
-    if (extraText.length) return { ok: false, reason: "顶层对象外不能包含额外文本。" };
+    if (extraText.length) return { ok: false, reason: "No extra text is allowed outside the top-level object." };
     const element = elements[0];
     if (element.matches?.("html,head,body,script,style,link,meta,title")) {
-      return { ok: false, reason: "当前安全编辑只支持替换页面正文对象。" };
+      return { ok: false, reason: "Safe editing only supports replacing objects in the page body." };
     }
     return { ok: true, element };
   }
@@ -2520,12 +2520,12 @@
     const errors = [];
 
     if (!currentNode || !replacement) {
-      return { ok: false, reason: "请先选中一个 HTML 对象。", warnings };
+      return { ok: false, reason: "Select an HTML object first.", warnings };
     }
 
     const forbiddenSelector = "script,style,link,meta,base,title,object,embed";
     if (replacement.matches?.(forbiddenSelector) || replacement.querySelector?.(forbiddenSelector)) {
-      errors.push("源码片段包含脚本、样式表或嵌入对象，已阻止应用。");
+      errors.push("The source snippet contains scripts, stylesheets, or embedded objects, so it was blocked.");
     }
 
     const nodes = [replacement, ...(replacement.querySelectorAll?.("*") || [])];
@@ -2534,10 +2534,10 @@
         const name = attribute.name.toLowerCase();
         const value = String(attribute.value || "").trim().toLowerCase();
         if (name.startsWith("on")) {
-          errors.push("源码片段包含事件处理属性，已阻止应用。");
+          errors.push("The source snippet contains event handler attributes, so it was blocked.");
         }
         if (["href", "src", "xlink:href", "formaction"].includes(name) && value.startsWith("javascript:")) {
-          errors.push("源码片段包含 javascript: 链接，已阻止应用。");
+          errors.push("The source snippet contains a javascript: link, so it was blocked.");
         }
       }
     }
@@ -2545,19 +2545,19 @@
     const beforeTag = currentNode.tagName?.toLowerCase?.() || "";
     const afterTag = replacement.tagName?.toLowerCase?.() || "";
     if (beforeTag && afterTag && beforeTag !== afterTag) {
-      warnings.push(`顶层标签将从 <${beforeTag}> 变为 <${afterTag}>。`);
+      warnings.push(`The top-level tag will change from <${beforeTag}> to <${afterTag}>.`);
     }
 
     const beforeId = currentNode.getAttribute("id") || "";
     const afterId = replacement.getAttribute("id") || "";
     if (beforeId !== afterId) {
-      warnings.push(beforeId || afterId ? `ID 将从「${beforeId || "无"}」变为「${afterId || "无"}」。` : "ID 将发生变化。");
+      warnings.push(beforeId || afterId ? `The ID will change from "${beforeId || "none"}" to "${afterId || "none"}".` : "The ID will change.");
     }
 
     const beforeClass = normalizedClassList(currentNode);
     const afterClass = normalizedClassList(replacement);
     if (beforeClass !== afterClass) {
-      warnings.push(`class 将从「${beforeClass || "无"}」变为「${afterClass || "无"}」。`);
+      warnings.push(`The class will change from "${beforeClass || "none"}" to "${afterClass || "none"}".`);
     }
 
     const uniqueErrors = [...new Set(errors)];
@@ -2576,10 +2576,10 @@
   }
 
   function validateSelectedHTMLSource(html) {
-    if (editorMode !== "html") return { ok: false, reason: "当前不是 HTML 文档模式。" };
-    if (!directSelectedNode || !directSelectedNode.isConnected) return { ok: false, reason: "请先选中一个 HTML 对象。" };
-    if (directSelectionNodes().length > 1) return { ok: false, reason: "源码片段编辑暂不支持多选对象。" };
-    if (directSelectedNode.matches?.("html,body")) return { ok: false, reason: "不能直接替换 html/body 根对象。" };
+    if (editorMode !== "html") return { ok: false, reason: "This is not HTML document mode." };
+    if (!directSelectedNode || !directSelectedNode.isConnected) return { ok: false, reason: "Select an HTML object first." };
+    if (directSelectionNodes().length > 1) return { ok: false, reason: "Source snippet editing does not support multiple selected objects yet." };
+    if (directSelectedNode.matches?.("html,body")) return { ok: false, reason: "The html/body root object cannot be replaced directly." };
 
     const doc = directSelectedNode.ownerDocument;
     const parsed = parseSingleHTMLSourceElement(html, doc);
@@ -2604,9 +2604,9 @@
     prepareDirectSubtree(replacement);
 
     const parent = directSelectedNode.parentElement;
-    if (!parent) return { ok: false, reason: "当前对象没有可替换的父级。" };
+    if (!parent) return { ok: false, reason: "This object has no replaceable parent." };
 
-    pushHistory({ label: "编辑源码片段" });
+    pushHistory({ label: "Edit source snippet" });
     parent.replaceChild(replacement, directSelectedNode);
     selectDirectNode(replacement);
     updateSelectionBox();
@@ -3539,47 +3539,47 @@
   }
 
   function directSemanticForNode(node) {
-    if (!node || !node.matches) return { role: "object", label: "对象" };
+    if (!node || !node.matches) return { role: "object", label: "Object" };
 
     const tag = node.tagName.toLowerCase();
     const names = `${node.id || ""} ${[...node.classList || []].join(" ")}`.toLowerCase();
 
-    if (tag === "body") return { role: "page", label: "页面" };
-    if (tag === "main") return { role: "main", label: "正文区" };
-    if (tag === "header") return { role: "header", label: "标题区" };
-    if (tag === "footer") return { role: "footer", label: "页脚" };
-    if (tag === "nav") return { role: "navigation", label: "导航" };
-    if (tag === "aside") return { role: "sidebar", label: "侧栏" };
-    if (/^(h[1-6])$/.test(tag)) return { role: "heading", label: `标题 ${tag.toUpperCase()}` };
-    if (tag === "p") return { role: "paragraph", label: "段落" };
-    if (tag === "span" || tag === "strong" || tag === "em" || tag === "small") return { role: "text", label: "文本" };
-    if (tag === "ul" || tag === "ol") return { role: "list", label: "列表" };
-    if (tag === "li") return { role: "list-item", label: "列表项" };
-    if (tag === "img" || tag === "picture") return { role: "image", label: "图片" };
-    if (tag === "figure") return { role: "figure", label: "图文组" };
-    if (tag === "figcaption") return { role: "caption", label: "图注" };
-    if (tag === "table") return { role: "table", label: "表格" };
-    if (tag === "thead" || tag === "tbody" || tag === "tfoot") return { role: "table-section", label: "表格区域" };
-    if (tag === "tr") return { role: "table-row", label: "表格行" };
-    if (tag === "th") return { role: "table-header-cell", label: "表头单元格" };
-    if (tag === "td") return { role: "table-cell", label: "单元格" };
-    if (tag === "a") return { role: "link", label: "链接" };
-    if (tag === "button") return { role: "button", label: "按钮" };
-    if (tag === "form") return { role: "form", label: "表单" };
-    if (["input", "textarea", "select", "label"].includes(tag)) return { role: "form-control", label: "表单项" };
-    if (["video", "audio", "iframe"].includes(tag)) return { role: "media", label: "媒体" };
-    if (["svg", "canvas"].includes(tag)) return { role: "graphic", label: "图形" };
+    if (tag === "body") return { role: "page", label: "Page" };
+    if (tag === "main") return { role: "main", label: "Main Content" };
+    if (tag === "header") return { role: "header", label: "Header" };
+    if (tag === "footer") return { role: "footer", label: "Footer" };
+    if (tag === "nav") return { role: "navigation", label: "Navigation" };
+    if (tag === "aside") return { role: "sidebar", label: "Sidebar" };
+    if (/^(h[1-6])$/.test(tag)) return { role: "heading", label: `Heading ${tag.toUpperCase()}` };
+    if (tag === "p") return { role: "paragraph", label: "Paragraph" };
+    if (tag === "span" || tag === "strong" || tag === "em" || tag === "small") return { role: "text", label: "Text" };
+    if (tag === "ul" || tag === "ol") return { role: "list", label: "List" };
+    if (tag === "li") return { role: "list-item", label: "List Item" };
+    if (tag === "img" || tag === "picture") return { role: "image", label: "Image" };
+    if (tag === "figure") return { role: "figure", label: "Figure" };
+    if (tag === "figcaption") return { role: "caption", label: "Caption" };
+    if (tag === "table") return { role: "table", label: "Table" };
+    if (tag === "thead" || tag === "tbody" || tag === "tfoot") return { role: "table-section", label: "Table Section" };
+    if (tag === "tr") return { role: "table-row", label: "Table Row" };
+    if (tag === "th") return { role: "table-header-cell", label: "Header Cell" };
+    if (tag === "td") return { role: "table-cell", label: "Cell" };
+    if (tag === "a") return { role: "link", label: "Link" };
+    if (tag === "button") return { role: "button", label: "Button" };
+    if (tag === "form") return { role: "form", label: "Form" };
+    if (["input", "textarea", "select", "label"].includes(tag)) return { role: "form-control", label: "Form Control" };
+    if (["video", "audio", "iframe"].includes(tag)) return { role: "media", label: "Media" };
+    if (["svg", "canvas"].includes(tag)) return { role: "graphic", label: "Graphic" };
 
-    if (/slide|page|sheet|canvas|screen|cover/.test(names)) return { role: "page", label: "页面" };
-    if (/hero|banner|masthead|title/.test(names)) return { role: "header", label: "标题区" };
-    if (/card|panel|tile|box/.test(names)) return { role: "card", label: "卡片" };
-    if (/table|matrix|grid/.test(names)) return { role: "table-like", label: "表格/矩阵" };
-    if (/chart|graph|figure|visual/.test(names)) return { role: "visual", label: "图表" };
-    if (/module|block|section|content|item/.test(names)) return { role: "module", label: "模块" };
+    if (/slide|page|sheet|canvas|screen|cover/.test(names)) return { role: "page", label: "Page" };
+    if (/hero|banner|masthead|title/.test(names)) return { role: "header", label: "Header" };
+    if (/card|panel|tile|box/.test(names)) return { role: "card", label: "Card" };
+    if (/table|matrix|grid/.test(names)) return { role: "table-like", label: "Table/Matrix" };
+    if (/chart|graph|figure|visual/.test(names)) return { role: "visual", label: "Chart" };
+    if (/module|block|section|content|item/.test(names)) return { role: "module", label: "Module" };
 
-    if (tag === "section" || tag === "article") return { role: "module", label: "模块" };
-    if (tag === "div") return { role: "container", label: "容器" };
-    return { role: "object", label: "对象" };
+    if (tag === "section" || tag === "article") return { role: "module", label: "Module" };
+    if (tag === "div") return { role: "container", label: "Container" };
+    return { role: "object", label: "Object" };
   }
 
   function visibleTreeChildren(node) {
@@ -3778,8 +3778,8 @@
     menuButton.type = "button";
     menuButton.className = "quick-action-menu-toggle";
     menuButton.textContent = "";
-    menuButton.title = "显示快捷操作";
-    menuButton.setAttribute("aria-label", "显示快捷操作");
+    menuButton.title = "Show quick actions";
+    menuButton.setAttribute("aria-label", "Show quick actions");
     menuButton.setAttribute("aria-expanded", "false");
     bar.appendChild(menuButton);
 
@@ -3795,7 +3795,7 @@
     const setMenuOpen = (open) => {
       bar.classList.toggle("is-open", open);
       menu.hidden = !open;
-      menuButton.title = open ? "收起快捷操作" : "显示快捷操作";
+      menuButton.title = open ? "Hide quick actions" : "Show quick actions";
       menuButton.setAttribute("aria-label", menuButton.title);
       menuButton.setAttribute("aria-expanded", String(open));
       requestAnimationFrame(() => placeDirectQuickActions(bar, rect));
@@ -3913,8 +3913,8 @@
     bar.classList.remove("is-open");
     if (menu) menu.hidden = true;
     if (menuButton) {
-      menuButton.title = "显示快捷操作";
-      menuButton.setAttribute("aria-label", "显示快捷操作");
+      menuButton.title = "Show quick actions";
+      menuButton.setAttribute("aria-label", "Show quick actions");
       menuButton.setAttribute("aria-expanded", "false");
     }
   }
@@ -3968,37 +3968,37 @@
     const tableContext = directTableContext();
 
     if (single && directNodeAllowsTextEdit(single)) {
-      actions.push({ action: "editText", label: "文字", title: "编辑文字", primary: true });
+      actions.push({ action: "editText", label: "Text", title: "Edit text", primary: true });
     }
 
     if (single && isImageLikeNode(single)) {
-      actions.push({ action: "replaceImage", label: "替换", title: "替换图片", primary: true });
-      actions.push({ action: "imageContain", label: "适应", title: "完整显示图片" });
-      actions.push({ action: "imageCover", label: "填充", title: "填满图片框" });
+      actions.push({ action: "replaceImage", label: "Replace", title: "Replace image", primary: true });
+      actions.push({ action: "imageContain", label: "Fit", title: "Show the whole image" });
+      actions.push({ action: "imageCover", label: "Fill", title: "Fill the image frame" });
     }
 
     if (tableContext?.table) {
-      actions.push({ action: "addRow", label: "+行", title: "在选区后添加表格行" });
-      actions.push({ action: "addColumn", label: "+列", title: "在选区后添加表格列" });
+      actions.push({ action: "addRow", label: "+Row", title: "Add a table row after the selection" });
+      actions.push({ action: "addColumn", label: "+Col", title: "Add a table column after the selection" });
     }
 
     if (single) {
       actions.push(
-        { action: "selectParent", label: "父级", title: "选择外层对象" },
-        { action: "selectChild", label: "子级", title: "选择第一个可见子对象" },
-        { action: "selectChildren", label: "子组", title: "选择全部可见子对象" },
-        { action: "selectPrevious", label: "前项", title: "选择前一个同级对象" },
-        { action: "selectNext", label: "后项", title: "选择后一个同级对象" },
-        { action: "selectSameClass", label: "同类", title: "选择同一组同类对象" }
+        { action: "selectParent", label: "Parent", title: "Select the outer object" },
+        { action: "selectChild", label: "Child", title: "Select the first visible child object" },
+        { action: "selectChildren", label: "Children", title: "Select all visible child objects" },
+        { action: "selectPrevious", label: "Prev", title: "Select the previous sibling object" },
+        { action: "selectNext", label: "Next", title: "Select the next sibling object" },
+        { action: "selectSameClass", label: "Similar", title: "Select the same kind of objects" }
       );
     }
 
     actions.push(
-      { action: "duplicate", label: "复制", title: "复制选中对象" },
-      { action: "fitWidth", label: "等宽", title: "适配页面宽度" },
-      { action: "front", label: "置顶", title: "置于顶层" },
-      { action: "back", label: "置底", title: "置于底层" },
-      { action: "delete", label: "删除", title: "删除选中对象", danger: true }
+      { action: "duplicate", label: "Duplicate", title: "Duplicate the selected object" },
+      { action: "fitWidth", label: "Fit W", title: "Fit to the page width" },
+      { action: "front", label: "Front", title: "Bring to front" },
+      { action: "back", label: "Back", title: "Send to back" },
+      { action: "delete", label: "Delete", title: "Delete the selected object", danger: true }
     );
 
     return actions;
@@ -4271,7 +4271,7 @@
       selectDirectNode(node);
     }
 
-    pushHistory({ label: "移动对象" });
+    pushHistory({ label: "Move object" });
     const nodes = directSelectionNodes().length > 1 && isDirectSelected(node) ? [...directSelectionNodes()] : [node];
     const startRect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(node);
     const gestureContext = buildDirectGestureContext(nodes);
@@ -4300,7 +4300,7 @@
     if (event.button !== 0 || !directSelectedNode) return;
     event.preventDefault();
     event.stopPropagation();
-    pushHistory({ label: "调整大小" });
+    pushHistory({ label: "Resize object" });
     const nodes = directSelectionNodes();
     const startRect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
     const gestureContext = buildDirectGestureContext(nodes);
@@ -4457,14 +4457,14 @@
   function buildDirectSnapCandidates(activeNodes) {
     const canvas = directCanvas();
     const x = [
-      { value: 0, label: "文档左边" },
-      { value: canvas.width / 2, label: "文档中线" },
-      { value: canvas.width, label: "文档右边" }
+      { value: 0, label: "document left" },
+      { value: canvas.width / 2, label: "document center" },
+      { value: canvas.width, label: "document right" }
     ];
     const y = [
-      { value: 0, label: "文档顶部" },
-      { value: canvas.height / 2, label: "文档中线" },
-      { value: canvas.height, label: "文档底部" }
+      { value: 0, label: "document top" },
+      { value: canvas.height / 2, label: "document center" },
+      { value: canvas.height, label: "document bottom" }
     ];
 
     const doc = directFrame?.contentDocument;
@@ -4472,16 +4472,16 @@
 
     for (const frame of directPageFrames()) {
       const rect = frame.rect;
-      const label = frame.label || "页面";
+      const label = frame.label || "page";
       x.push(
-        { value: rect.x, label: `${label}左边` },
-        { value: rect.x + rect.w / 2, label: `${label}中线` },
-        { value: rect.x + rect.w, label: `${label}右边` }
+        { value: rect.x, label: `${label} left` },
+        { value: rect.x + rect.w / 2, label: `${label} center` },
+        { value: rect.x + rect.w, label: `${label} right` }
       );
       y.push(
-        { value: rect.y, label: `${label}顶部` },
-        { value: rect.y + rect.h / 2, label: `${label}中线` },
-        { value: rect.y + rect.h, label: `${label}底部` }
+        { value: rect.y, label: `${label} top` },
+        { value: rect.y + rect.h / 2, label: `${label} center` },
+        { value: rect.y + rect.h, label: `${label} bottom` }
       );
     }
 
@@ -4489,16 +4489,16 @@
     for (const node of nodes) {
       if (activeNodes.has(node) || !isDirectNodeVisible(node)) continue;
       const nodeRect = directNodeRect(node);
-      const label = directSemanticForNode(node).label || "对象";
+      const label = directSemanticForNode(node).label || "object";
       x.push(
-        { value: nodeRect.x, label: `${label}左边` },
-        { value: nodeRect.x + nodeRect.w / 2, label: `${label}中线` },
-        { value: nodeRect.x + nodeRect.w, label: `${label}右边` }
+        { value: nodeRect.x, label: `${label} left` },
+        { value: nodeRect.x + nodeRect.w / 2, label: `${label} center` },
+        { value: nodeRect.x + nodeRect.w, label: `${label} right` }
       );
       y.push(
-        { value: nodeRect.y, label: `${label}顶部` },
-        { value: nodeRect.y + nodeRect.h / 2, label: `${label}中线` },
-        { value: nodeRect.y + nodeRect.h, label: `${label}底部` }
+        { value: nodeRect.y, label: `${label} top` },
+        { value: nodeRect.y + nodeRect.h / 2, label: `${label} center` },
+        { value: nodeRect.y + nodeRect.h, label: `${label} bottom` }
       );
     }
 
@@ -4651,7 +4651,7 @@
     if (!node || !directNodeAllowsTextEdit(node)) return null;
     pendingDirectTextEditNode = null;
     selectDirectNode(node);
-    pushHistory({ label: "修改文字" });
+    pushHistory({ label: "Edit text" });
     activeDirectTextEditNode = node;
     const unlockTypography = lockDirectEditTypography(node);
     markDirectEditAttribute(node, "contenteditable", "data-chiselo-edit-contenteditable");
@@ -4745,7 +4745,7 @@
     }
 
     if (!directSelectedNode || !directSelectedNode.isConnected) return;
-    pushHistory({ label: "调整对象", coalesceKey: directHistoryCoalesceKey("direct-update", nodes), interval: 800 });
+    pushHistory({ label: "Adjust object", coalesceKey: directHistoryCoalesceKey("direct-update", nodes), interval: 800 });
     if (directElementHasGeometryUpdate(directSelectedNode, nextElement)) {
       applyDirectRect(directSelectedNode, nextElement);
     }
@@ -4759,7 +4759,7 @@
   function updateDirectGroupElement(nodes, nextElement) {
     if (!nodes.length) return;
 
-    pushHistory({ label: "调整对象组", coalesceKey: directHistoryCoalesceKey("direct-group-update", nodes), interval: 800 });
+    pushHistory({ label: "Adjust object group", coalesceKey: directHistoryCoalesceKey("direct-group-update", nodes), interval: 800 });
     const currentRect = directNodesBounds(nodes);
     const nextRect = {
       x: Number.isFinite(nextElement.x) ? nextElement.x : currentRect.x,
@@ -4850,7 +4850,7 @@
         writebackKind: "inline-style",
         writebackLabel: "inline style",
         writebackTarget: "style",
-        writebackDetail: "当前对象已有 inline style，样式修改会继续写在该对象上。"
+        writebackDetail: "This object already has an inline style, so style changes keep going onto the object itself."
       };
     }
 
@@ -4858,9 +4858,9 @@
     if (selector) {
       return {
         writebackKind: "stylesheet-rule",
-        writebackLabel: "CSS 规则",
+        writebackLabel: "CSS rule",
         writebackTarget: selector,
-        writebackDetail: `安全样式修改会优先写回本地 CSS 规则 ${selector}。`
+        writebackDetail: `Safe style changes are written back to the local CSS rule ${selector} first.`
       };
     }
 
@@ -4871,8 +4871,8 @@
       writebackLabel: "inline style",
       writebackTarget: "style",
       writebackDetail: classCount > 0 || id
-        ? "未找到只命中当前对象的本地 CSS 规则，样式修改会写在对象 inline style 上，避免误改同类对象。"
-        : "当前对象没有稳定的唯一 CSS 规则，样式修改会写在对象 inline style 上。"
+        ? "No local CSS rule matches only this object, so style changes go to the object inline style to avoid altering similar objects by mistake."
+        : "This object has no stable unique CSS rule, so style changes go to the object inline style."
     };
   }
 
@@ -5018,11 +5018,11 @@
 
   function revertVisualChange(changeKey) {
     if (editorMode !== "html" || !directVisualBaseline?.entries || !changeKey) {
-      return { ok: false, reason: "没有可回退的 HTML 视觉基线。" };
+      return { ok: false, reason: "There is no HTML visual baseline to revert to." };
     }
 
     const doc = directFrame?.contentDocument;
-    if (!doc) return { ok: false, reason: "当前 HTML 文档不可用。" };
+    if (!doc) return { ok: false, reason: "The current HTML document is unavailable." };
 
     const key = String(changeKey);
     const current = captureDirectVisualSnapshot(doc);
@@ -5030,25 +5030,25 @@
     const after = current.entries.get(key) || null;
     const kind = before && after ? visualEntryChangeKind(before, after) : before ? "删除对象" : after ? "新增对象" : null;
     if (!kind) {
-      return { ok: false, reason: "这处变化已经不存在。" };
+      return { ok: false, reason: "This change no longer exists." };
     }
 
     const revertInfo = visualChangeRevertInfo(kind, before, after);
     if (!revertInfo.canRevert) {
-      return { ok: false, reason: revertInfo.reason || "这处变化不能安全一键回退。" };
+      return { ok: false, reason: revertInfo.reason || "This change cannot be safely reverted in one step." };
     }
 
     const node = kind === "删除对象" ? null : findDirectNodeByVisualChangeKey(key, after || before);
     if (kind !== "删除对象" && !node) {
-      return { ok: false, reason: "未找到当前对象，请刷新预检后再试。" };
+      return { ok: false, reason: "Could not find the object. Refresh preflight and try again." };
     }
 
     const deletedRestore = kind === "删除对象" ? prepareDeletedDirectNodeRestore(before) : null;
     if (kind === "删除对象" && !deletedRestore) {
-      return { ok: false, reason: "原父级位置已变化，无法安全恢复此删除对象。" };
+      return { ok: false, reason: "The original parent position changed, so this deleted object cannot be restored safely." };
     }
 
-    pushHistory({ label: "回退视觉变更" });
+    pushHistory({ label: "Revert visual change" });
 
     if (!before && after) {
       const parent = node.parentElement;
@@ -5061,7 +5061,7 @@
     } else if (kind === "删除对象") {
       const restoredDeletedNode = commitDeletedDirectNodeRestore(deletedRestore);
       if (!restoredDeletedNode) {
-        return { ok: false, reason: "原父级位置已变化，无法安全恢复此删除对象。" };
+        return { ok: false, reason: "The original parent position changed, so this deleted object cannot be restored safely." };
       }
       selectDirectNode(restoredDeletedNode);
     } else if (kind === "文字") {
@@ -5069,7 +5069,7 @@
       selectDirectNode(node);
     } else if (kind === "图片") {
       const image = node.matches?.("img") ? node : node.querySelector?.("img");
-      if (!image) return { ok: false, reason: "当前对象不是可回退图片。" };
+      if (!image) return { ok: false, reason: "This object is not a revertable image." };
       image.setAttribute("src", before.imageSource || "");
       selectDirectNode(image);
       settleDirectImageNode(image);
@@ -5079,7 +5079,7 @@
       }
       if (visualStylesheetRuleDiffers(before, after)) {
         if (!restoreDirectStylesheetRule(node, before, after)) {
-          return { ok: false, reason: "样式表规则已变化或不再唯一命中当前对象，未自动回退。" };
+          return { ok: false, reason: "The stylesheet rule changed or no longer matches this object uniquely, so it was not reverted automatically." };
         }
       }
       selectDirectNode(node);
@@ -5191,7 +5191,7 @@
     const image = selectedImageNode();
     if (!image) return null;
 
-    pushHistory({ label: "替换图片" });
+    pushHistory({ label: "Replace image" });
     image.setAttribute("src", src);
     selectDirectNode(image);
     scheduleHTMLTreeChanged();
@@ -5219,7 +5219,7 @@
   function styleSelectedImage(style) {
     const image = selectedImageNode();
     if (!image) return null;
-    pushHistory({ label: "调整图片" });
+    pushHistory({ label: "Adjust image" });
     image.style.width = "100%";
     image.style.height = "100%";
     image.style.objectFit = objectFitValue(style.objectFit, "contain");
@@ -5234,7 +5234,7 @@
     const context = directTableContext();
     if (!context?.row) return null;
 
-    pushHistory({ label: "添加表格行" });
+    pushHistory({ label: "Add table row" });
     const row = cloneTableRow(context);
     context.row.insertAdjacentElement("afterend", row);
     const target = row.cells[Math.min(context.columnIndex, Math.max(0, row.cells.length - 1))] || row;
@@ -5247,7 +5247,7 @@
     const context = directTableContext();
     if (!context?.row || context.rows.length <= 1) return null;
 
-    pushHistory({ label: "删除表格行" });
+    pushHistory({ label: "Delete table row" });
     const currentIndex = context.rows.indexOf(context.row);
     const targetRow = context.rows[currentIndex + 1] || context.rows[currentIndex - 1] || null;
     context.row.remove();
@@ -5267,7 +5267,7 @@
     const context = directTableContext();
     if (!context?.table || !context.rows.length) return null;
 
-    pushHistory({ label: "添加表格列" });
+    pushHistory({ label: "Add table column" });
     let selectedCell = null;
     const insertAfterColumn = context.columnIndex;
     const grid = tableGrid(context.table);
@@ -5305,7 +5305,7 @@
     const context = directTableContext();
     if (!context?.table || maxTableColumns(context.table) <= 1) return null;
 
-    pushHistory({ label: "删除表格列" });
+    pushHistory({ label: "Delete table column" });
     let nextSelection = null;
     const grid = tableGrid(context.table);
     const touched = new Set();
@@ -5333,7 +5333,7 @@
     const context = directTableContext();
     if (!context?.cell) return null;
 
-    pushHistory({ label: "修改文字" });
+    pushHistory({ label: "Edit text" });
     applyDirectStyle(context.cell, style);
     selectDirectNode(context.cell);
     scheduleHTMLTreeChanged();
@@ -5378,7 +5378,7 @@
     for (let column = 0; column < columns; column += 1) {
       if (occupiedColumns.has(column)) continue;
       const cell = cloneTableCell(reference || doc.createElement("td"));
-      resetInsertedTableCell(cell, reference?.tagName?.toLowerCase() === "th" ? "新表头" : "新单元格");
+      resetInsertedTableCell(cell, reference?.tagName?.toLowerCase() === "th" ? "New Header" : "New Cell");
       row.appendChild(cell);
     }
 
@@ -5389,7 +5389,7 @@
   function cloneTableCell(referenceCell) {
     const cell = referenceCell.cloneNode(true);
     prepareClonedDirectSubtree(cell);
-    resetInsertedTableCell(cell, referenceCell.tagName.toLowerCase() === "th" ? "新表头" : "新单元格");
+    resetInsertedTableCell(cell, referenceCell.tagName.toLowerCase() === "th" ? "New Header" : "New Cell");
     return cell;
   }
 
@@ -5480,7 +5480,7 @@
   function deleteDirectSelected() {
     const nodes = topLevelDirectNodes(directSelectionNodes());
     if (!nodes.length) return false;
-    pushHistory({ label: "删除对象" });
+    pushHistory({ label: "Delete object" });
     for (const node of nodes) {
       node.remove();
     }
@@ -5497,7 +5497,7 @@
     const nodes = topLevelDirectNodes(directSelectionNodes());
     if (!nodes.length) return false;
 
-    pushHistory({ label: "复制对象" });
+    pushHistory({ label: "Duplicate object" });
     const copies = [];
     for (const node of nodes) {
       const copy = node.cloneNode(true);
@@ -5520,7 +5520,7 @@
   function alignDirectSelected(edge) {
     const nodes = directSelectionNodes();
     if (!nodes.length) return;
-    pushHistory({ label: "对齐对象" });
+    pushHistory({ label: "Align objects" });
     const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
     const frame = directAlignmentFrame(directSelectedNode);
     const original = { ...rect };
@@ -5551,7 +5551,7 @@
     const reference = nodes.includes(directSelectedNode) ? directSelectedNode : nodes[0];
     const referenceRect = directNodeRect(reference);
 
-    pushHistory({ label: "统一尺寸" });
+    pushHistory({ label: "Match size" });
     for (const node of nodes) {
       const rect = directNodeRect(node);
       if (mode === "width") rect.w = referenceRect.w;
@@ -5579,7 +5579,7 @@
     const span = axis === "horizontal" ? bounds.w : bounds.h;
     const gap = (span - totalSize) / Math.max(1, rects.length - 1);
 
-    pushHistory({ label: "分布对象" });
+    pushHistory({ label: "Distribute objects" });
     let cursor = axis === "horizontal" ? bounds.x : bounds.y;
     for (const item of rects) {
       const nextRect = { ...item.rect };
@@ -5603,7 +5603,7 @@
     const nodes = directSelectionNodes();
     if (!nodes.length) return;
 
-    pushHistory({ label: "适配尺寸" });
+    pushHistory({ label: "Fit size" });
     const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
     const original = { ...rect };
     const frame = directAlignmentFrame(directSelectedNode);
@@ -5629,7 +5629,7 @@
     const nodes = directSelectionNodes();
     if (!nodes.length) return;
 
-    pushHistory({ label: "吸附网格" });
+    pushHistory({ label: "Snap to grid" });
     const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
     const original = { ...rect };
     rect.x = snapNumber(rect.x, grid);
@@ -5660,7 +5660,7 @@
   function directPageFrames() {
     const doc = directFrame?.contentDocument;
     if (!doc?.body) {
-      return [{ index: 0, label: "页面", rect: directCanvasRect() }];
+      return [{ index: 0, label: "Page", rect: directCanvasRect() }];
     }
 
     const candidates = directPageFrameCandidates(doc);
@@ -5687,7 +5687,7 @@
 
   function pageFrameLabel(node, index, total) {
     if (!node || node.matches?.("body")) {
-      return total > 1 ? `页面 ${index + 1}` : "页面";
+      return total > 1 ? `Page ${index + 1}` : "Page";
     }
     const explicit = node.getAttribute("data-title")
       || node.getAttribute("aria-label")
@@ -5695,7 +5695,7 @@
       || "";
     if (explicit.trim()) return explicit.trim().slice(0, 28);
     const semantic = directSemanticForNode(node);
-    if (semantic.role === "page") return total > 1 ? `页面 ${index + 1}` : "页面";
+    if (semantic.role === "page") return total > 1 ? `Page ${index + 1}` : "Page";
     return total > 1 ? `${semantic.label} ${index + 1}` : semantic.label;
   }
 
@@ -5724,7 +5724,7 @@
   function arrangeDirectSelected(mode) {
     const nodes = directSelectionNodes();
     if (!nodes.length) return false;
-    pushHistory({ label: "调整层级" });
+    pushHistory({ label: "Change layer order" });
     for (const node of nodes) {
       const style = node.ownerDocument.defaultView.getComputedStyle(node);
       const current = parseInt(style.zIndex, 10);
@@ -6150,7 +6150,7 @@
       sourceKind: "computed-style",
       editability: "style-editable",
       fidelity: "native",
-      captureNote: "由浏览器计算后的背景、边框或形状转换",
+      captureNote: "Converted from the browser-computed background, border, or shape",
       x: rect.x,
       y: rect.y,
       w: rect.w,
@@ -6178,12 +6178,12 @@
       tagName: "img",
       htmlPath: directNodePath(node),
       semanticRole: "image",
-      semanticLabel: "图片",
+      semanticLabel: "Image",
       ...capturedGroupForNode(node),
       sourceKind: "image",
       editability: "replaceable",
       fidelity: "native",
-      captureNote: "保留为可替换图片对象",
+      captureNote: "Kept as a replaceable image object",
       imageSource: node.currentSrc || node.src || node.getAttribute("src") || "",
       imageAlt: node.getAttribute("alt") || "",
       x: rect.x,
@@ -6222,7 +6222,7 @@
       sourceKind: "text",
       editability: "text-editable",
       fidelity: "native",
-      captureNote: "保留为可直接修改的文本对象",
+      captureNote: "Kept as a directly editable text object",
       x: rect.x,
       y: rect.y,
       w: rect.w,
@@ -6291,12 +6291,12 @@
         tagName: pseudo,
         htmlPath: `${directNodePath(node)} ${pseudo}`,
         semanticRole: "text",
-        semanticLabel: "伪元素文本",
+        semanticLabel: "Pseudo-element Text",
         ...capturedGroupForNode(node),
         sourceKind: "pseudo-element",
         editability: "text-editable",
         fidelity: "approximated",
-        captureNote: "由 CSS 伪元素内容提取为真实文本对象",
+        captureNote: "Extracted from CSS pseudo-element content into a real text object",
         x: rect.x,
         y: rect.y,
         w: rect.w,
@@ -6321,12 +6321,12 @@
       tagName: pseudo,
       htmlPath: `${directNodePath(node)} ${pseudo}`,
       semanticRole: "visual",
-      semanticLabel: "伪元素图形",
+      semanticLabel: "Pseudo-element Graphic",
       ...capturedGroupForNode(node),
       sourceKind: "pseudo-element",
       editability: "style-editable",
       fidelity: "approximated",
-      captureNote: "由 CSS 伪元素视觉效果近似为形状对象",
+      captureNote: "Approximated from a CSS pseudo-element visual effect into a shape object",
       x: rect.x,
       y: rect.y,
       w: rect.w,
@@ -6356,7 +6356,7 @@
       tagName: tag,
       htmlPath: directNodePath(node),
       semanticRole: tag === "iframe" ? "embedded-page" : tag === "canvas" ? "canvas" : "media",
-      semanticLabel: tag === "iframe" ? "嵌入页面" : tag === "canvas" ? "画布整体" : "媒体整体",
+      semanticLabel: tag === "iframe" ? "Embedded Page" : tag === "canvas" ? "Whole Canvas" : "Whole Media",
       ...capturedGroupForNode(node),
       sourceKind: tag,
       editability: "whole-object",
@@ -6401,11 +6401,11 @@
   function fallbackCaptureNote(node, imageSource) {
     const tag = node.tagName.toLowerCase();
     if (tag === "canvas") {
-      return imageSource ? "Canvas 已捕获为当前像素图，不能拆成文本或图形对象" : "Canvas 无法读取像素，保留为整体占位对象";
+      return imageSource ? "The canvas was captured as a pixel image and cannot be split into text or graphic objects" : "The canvas pixels could not be read, so it is kept as a whole placeholder object";
     }
-    if (tag === "iframe") return "嵌入页面受安全边界限制，保留为整体对象";
-    if (tag === "video") return imageSource ? "视频以封面图保留为整体对象" : "视频保留为整体占位对象";
-    return "复杂嵌入内容保留为整体对象";
+    if (tag === "iframe") return "Embedded pages are restricted by security boundaries, so they are kept as whole objects";
+    if (tag === "video") return imageSource ? "The video is kept as a whole object using its poster image" : "The video is kept as a whole placeholder object";
+    return "Complex embedded content is kept as a whole object";
   }
 
   function fallbackAltForNode(node) {
@@ -6435,7 +6435,7 @@
     return {
       groupId: stableGroupId(groupNode),
       groupRole: semantic.role === "container" ? "module" : semantic.role,
-      groupLabel: semantic.label === "容器" ? "模块" : semantic.label
+      groupLabel: semantic.label === "Container" ? "Module" : semantic.label
     };
   }
 
@@ -6866,8 +6866,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "broken-image",
         severity: "error",
-        title: "图片断链",
-        detail: diagnosticResourceDetail(image, "图片资源无法加载"),
+        title: "Broken image",
+        detail: diagnosticResourceDetail(image, "The image resource could not be loaded"),
         elementId: ensureDirectId(image)
       });
     }
@@ -6876,8 +6876,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "broken-media",
         severity: "error",
-        title: "媒体断链",
-        detail: diagnosticResourceDetail(node, "音视频资源无法加载"),
+        title: "Broken media",
+        detail: diagnosticResourceDetail(node, "The audio or video resource could not be loaded"),
         elementId: ensureDirectId(node)
       });
     }
@@ -6886,8 +6886,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "span-table",
         severity: "warning",
-        title: "合并单元格",
-        detail: `${spanTables.length} 个表格含合并单元格，导出到 PPTX 后需要复核`,
+        title: "Merged cells",
+        detail: `${spanTables.length} table(s) contain merged cells and need review after PPTX export`,
         elementId: ensureDirectId(spanTables[0])
       });
     }
@@ -6896,8 +6896,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "dirty-export",
         severity: "error",
-        title: "导出不干净",
-        detail: "HTML 中仍包含编辑器临时标记或编辑态变量"
+        title: "Export not clean",
+        detail: "The HTML still contains editor-only markers or editing-state variables"
       });
     }
 
@@ -7024,8 +7024,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "runtime-rendered",
         severity: "warning",
-        title: "脚本渲染页面",
-        detail: "内容可能由脚本实时渲染，部分模块会在导入后替换或重绘",
+        title: "Script-rendered page",
+        detail: "The content may be rendered live by scripts, and some modules can be replaced or repainted after import",
         elementId: optionalDirectId(element)
       });
     }
@@ -7036,8 +7036,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "iframe-content",
         severity: "warning",
-        title: "嵌入页面",
-        detail: `${iframes.length} 个嵌入页面无法像普通模块一样直接精修`,
+        title: "Embedded pages",
+        detail: `${iframes.length} embedded page(s) cannot be refined directly like ordinary modules`,
         elementId: optionalDirectId(iframes[0])
       });
     }
@@ -7048,8 +7048,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "canvas-content",
         severity: "warning",
-        title: "画布内容",
-        detail: `${canvases.length} 个画布区域通常只能按整体对象处理`,
+        title: "Canvas content",
+        detail: `${canvases.length} canvas region(s) can usually only be handled as whole objects`,
         elementId: optionalDirectId(canvases[0])
       });
     }
@@ -7060,8 +7060,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "shadow-content",
         severity: "warning",
-        title: "封装组件",
-        detail: `${shadowHosts.length} 个封装组件可能无法完整展开为可编辑对象`,
+        title: "Encapsulated components",
+        detail: `${shadowHosts.length} encapsulated component(s) may not fully expand into editable objects`,
         elementId: optionalDirectId(shadowHosts[0])
       });
     }
@@ -7072,8 +7072,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "selection-overlay",
         severity: "warning",
-        title: "遮罩挡住选择",
-        detail: `${overlayBlockers.length} 个透明遮罩已在编辑中临时穿透，导出前建议复核`,
+        title: "Overlay blocking selection",
+        detail: `${overlayBlockers.length} transparent overlay(s) are temporarily click-through while editing. Review before exporting`,
         elementId: optionalDirectId(overlayBlockers[0])
       });
     }
@@ -7084,8 +7084,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "external-runtime-resource",
         severity: "warning",
-        title: "外部运行资源",
-        detail: `${externalResources.length} 个外部脚本/样式/框架资源可能影响离线编辑和导出`,
+        title: "External runtime resources",
+        detail: `${externalResources.length} external script/style/framework resource(s) may affect offline editing and export`,
         elementId: optionalDirectId(externalResources[0])
       });
     }
@@ -7208,8 +7208,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "visual-change",
         severity: "warning",
-        title: "视觉变更",
-        detail: `${count} 个对象相对打开时发生变化：${detail}`,
+        title: "Visual changes",
+        detail: `${count} object(s) changed since the file was opened: ${detail}`,
         elementId: firstElementId
       });
     }
@@ -7249,7 +7249,7 @@ ${htmlSlides}
     return {
       changeKey: key || null,
       elementId: entry?.elementId || null,
-      label: truncateDiagnosticText(entry?.label || "", "对象"),
+      label: truncateDiagnosticText(entry?.label || "", "Object"),
       kind,
       detail: detail.detail,
       beforeValue: detail.beforeValue,
@@ -7281,7 +7281,7 @@ ${htmlSlides}
 
   function visualChangeWritebackLabel(kind) {
     if (kind === "inline-style") return "inline style";
-    if (kind === "stylesheet-rule") return "CSS 规则";
+    if (kind === "stylesheet-rule") return "CSS rule";
     return null;
   }
 
@@ -7292,18 +7292,18 @@ ${htmlSlides}
     if (before && !after) {
       return before.outerHTML && before.parentKey
         ? { canRevert: true, reason: null }
-        : { canRevert: false, reason: "已删除对象缺少可恢复源码快照，请从版本历史恢复或手动重建。" };
+        : { canRevert: false, reason: "The deleted object has no restorable source snapshot. Restore from Version History or rebuild it manually." };
     }
     if (!before || !after) {
-      return { canRevert: false, reason: "缺少打开时或当前对象快照。" };
+      return { canRevert: false, reason: "Missing the at-open or current snapshot for this object." };
     }
 
     if (kind === "文字") {
       if (before.childElementCount > 0 || after.childElementCount > 0) {
-        return { canRevert: false, reason: "对象含内联结构，自动回退可能破坏源码层级。" };
+        return { canRevert: false, reason: "The object contains inline structure, so an automatic revert could break the source hierarchy." };
       }
       if (String(before.text || "").length > MAX_VISUAL_REVERT_TEXT_LENGTH) {
-        return { canRevert: false, reason: "文字过长，建议定位后手动复核。" };
+        return { canRevert: false, reason: "The text is too long. Locate it and review manually." };
       }
       return { canRevert: true, reason: null };
     }
@@ -7311,63 +7311,63 @@ ${htmlSlides}
     if (kind === "图片") {
       return after.imageSource !== undefined
         ? { canRevert: true, reason: null }
-        : { canRevert: false, reason: "当前对象不是可替换图片。" };
+        : { canRevert: false, reason: "This object is not a replaceable image." };
     }
 
     if (kind === "位置/尺寸" || kind === "样式") {
       return before.styleAttr !== after.styleAttr || visualStylesheetRuleDiffers(before, after)
         ? { canRevert: true, reason: null }
-        : { canRevert: false, reason: "变化来自样式表、响应式规则或父级布局，先定位后手动复核更安全。" };
+        : { canRevert: false, reason: "The change comes from a stylesheet, a responsive rule, or the parent layout. Locating it and reviewing manually is safer." };
     }
 
-    return { canRevert: false, reason: "此类变化暂不支持一键回退。" };
+    return { canRevert: false, reason: "This kind of change does not support one-step revert yet." };
   }
 
   function visualChangeDetail(kind, before, after) {
     if (!before && after) {
       return {
-        detail: "新增对象，回退会从当前 HTML 中移除此对象。",
-        beforeValue: "无",
+        detail: "Added object. Reverting will remove this object from the current HTML.",
+        beforeValue: "none",
         afterValue: visualRectText(after.rect)
       };
     }
     if (before && !after) {
       return {
-        detail: "对象已删除，可尝试一键恢复到打开时的位置。",
+        detail: "The object was deleted. You can try restoring it to its position at open in one step.",
         beforeValue: visualRectText(before.rect),
-        afterValue: "已删除"
+        afterValue: "deleted"
       };
     }
     if (!before || !after) {
-      return { detail: "缺少可比对快照。", beforeValue: null, afterValue: null };
+      return { detail: "No comparable snapshot available.", beforeValue: null, afterValue: null };
     }
 
     if (kind === "位置/尺寸") {
       return {
-        detail: "位置或尺寸发生变化。",
+        detail: "Position or size changed.",
         beforeValue: visualRectText(before.rect),
         afterValue: visualRectText(after.rect)
       };
     }
     if (kind === "文字") {
       return {
-        detail: "文字内容发生变化。",
-        beforeValue: truncateDiagnosticText(before.text, "空文字"),
-        afterValue: truncateDiagnosticText(after.text, "空文字")
+        detail: "Text content changed.",
+        beforeValue: truncateDiagnosticText(before.text, "empty text"),
+        afterValue: truncateDiagnosticText(after.text, "empty text")
       };
     }
     if (kind === "图片") {
       return {
-        detail: "图片来源发生变化。",
+        detail: "Image source changed.",
         beforeValue: visualSourceLabel(before.imageSource),
         afterValue: visualSourceLabel(after.imageSource)
       };
     }
 
     const changedStyles = visualStyleDiffKeys(before.style, after.style);
-    const detailSuffix = visualStylesheetRuleDiffers(before, after) ? "（写回样式表规则）" : "";
+    const detailSuffix = visualStylesheetRuleDiffers(before, after) ? " (written back to the stylesheet rule)" : "";
     return {
-      detail: changedStyles.length ? `关键样式变化：${changedStyles.join("、")}${detailSuffix}` : `关键样式发生变化${detailSuffix}。`,
+      detail: changedStyles.length ? `Key style changes: ${changedStyles.join(", ")}${detailSuffix}` : `Key styles changed${detailSuffix}.`,
       beforeValue: visualStyleSummary(before.style, changedStyles),
       afterValue: visualStyleSummary(after.style, changedStyles)
     };
@@ -7380,24 +7380,24 @@ ${htmlSlides}
 
   function visualSourceLabel(value) {
     const source = String(value || "").trim();
-    if (!source) return "空";
-    if (source.startsWith("data:")) return "嵌入图片";
+    if (!source) return "empty";
+    if (source.startsWith("data:")) return "embedded image";
     return truncateDiagnosticText(source.split(/[/?#]/).filter(Boolean).pop() || source, source);
   }
 
   function visualStyleDiffKeys(before = {}, after = {}) {
     const labels = {
-      color: "文字色",
-      background: "背景",
-      borderColor: "边框色",
-      borderWidth: "边框",
-      radius: "圆角",
-      fontSize: "字号",
-      fontWeight: "字重",
-      textAlign: "对齐",
-      objectFit: "图片适配",
-      opacity: "透明度",
-      shadow: "阴影"
+      color: "Text color",
+      background: "Background",
+      borderColor: "Border color",
+      borderWidth: "Border width",
+      radius: "Corner radius",
+      fontSize: "Font size",
+      fontWeight: "Font weight",
+      textAlign: "Alignment",
+      objectFit: "Image fit",
+      opacity: "Opacity",
+      shadow: "Shadow"
     };
     return Object.keys(labels).filter((key) => JSON.stringify(before?.[key]) !== JSON.stringify(after?.[key])).map((key) => labels[key]);
   }
@@ -7405,22 +7405,22 @@ ${htmlSlides}
   function visualStyleSummary(style = {}, changedKeys = []) {
     if (!changedKeys.length) return "";
     const reverseLabels = {
-      "文字色": "color",
-      "背景": "background",
-      "边框色": "borderColor",
-      "边框": "borderWidth",
-      "圆角": "radius",
-      "字号": "fontSize",
-      "字重": "fontWeight",
-      "对齐": "textAlign",
-      "图片适配": "objectFit",
-      "透明度": "opacity",
-      "阴影": "shadow"
+      "Text color": "color",
+      "Background": "background",
+      "Border color": "borderColor",
+      "Border width": "borderWidth",
+      "Corner radius": "radius",
+      "Font size": "fontSize",
+      "Font weight": "fontWeight",
+      "Alignment": "textAlign",
+      "Image fit": "objectFit",
+      "Opacity": "opacity",
+      "Shadow": "shadow"
     };
     return changedKeys
       .slice(0, 3)
-      .map((label) => `${label} ${truncateDiagnosticText(style?.[reverseLabels[label]], "空")}`)
-      .join("；");
+      .map((label) => `${label} ${truncateDiagnosticText(style?.[reverseLabels[label]], "empty")}`)
+      .join("; ");
   }
 
   function collectSourceMaturityDiagnostics(doc, visualDiffDiagnostics, issues) {
@@ -7447,10 +7447,10 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "responsive-review",
         severity: "warning",
-        title: "多宽度复核",
+        title: "Multi-width review",
         detail: affected > 0
-          ? `${affected} 个已修改对象处在响应式布局影响链里，建议重点检查${responsiveWidthSummary(responsiveReviewWidths)}`
-          : `检测到 ${responsiveRuleCount} 条响应式规则或网格/弹性布局，修改后建议检查${responsiveWidthSummary(responsiveReviewWidths)}`,
+          ? `${affected} changed object(s) sit inside a responsive layout chain. Focus on ${responsiveWidthSummary(responsiveReviewWidths)}`
+          : `Detected ${responsiveRuleCount} responsive rule(s) or grid/flex layout. After editing, check ${responsiveWidthSummary(responsiveReviewWidths)}`,
         elementId: responsiveChangeDiagnostics.responsiveChangeElementId
       });
     }
@@ -7459,8 +7459,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "source-pollution-review",
         severity: "warning",
-        title: "源码改写复核",
-        detail: `${inlineStyleChangeCount} 个变化对象改动了 inline style；若原稿依赖 class/stylesheet，保存前建议确认源码仍可维护`
+        title: "Source rewrite review",
+        detail: `${inlineStyleChangeCount} changed object(s) modified inline style. If the original relies on classes or stylesheets, confirm the source stays maintainable before saving`
       });
     }
 
@@ -7468,8 +7468,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "stylesheet-rule-writeback",
         severity: "info",
-        title: "样式表写回",
-        detail: `${stylesheetRuleWritebackCount} 次样式修改已写入本地 class 规则，源码比 inline style 更易维护`
+        title: "Stylesheet writeback",
+        detail: `${stylesheetRuleWritebackCount} style change(s) were written into local class rules, which is easier to maintain than inline style`
       });
     }
 
@@ -7477,8 +7477,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "stylesheet-edit-review",
         severity: "warning",
-        title: "外部样式表",
-        detail: `${externalStylesheetAffectedChangeDiagnostics.count} 个已修改对象可能受 ${externalStylesheetCount} 个外部样式表影响，保存前建议复核宽度和 class 效果`,
+        title: "External stylesheets",
+        detail: `${externalStylesheetAffectedChangeDiagnostics.count} changed object(s) may be affected by ${externalStylesheetCount} external stylesheet(s). Review widths and class effects before saving`,
         elementId: externalStylesheetAffectedChangeDiagnostics.elementId
       });
     }
@@ -7590,8 +7590,8 @@ ${htmlSlides}
         });
         output.responsiveChangeItems.push({
           ...item,
-          detail: `${item.detail || "对象发生变化。"} ${reason}，请检查${responsiveWidthSummary(context.responsiveReviewWidths)}。`,
-          beforeValue: influence.reviewWidths.length ? `建议宽度 ${influence.reviewWidths.join(" / ")}px` : item.beforeValue,
+          detail: `${item.detail || "The object changed."} ${reason}. Check ${responsiveWidthSummary(context.responsiveReviewWidths)}.`,
+          beforeValue: influence.reviewWidths.length ? `Suggested widths ${influence.reviewWidths.join(" / ")}px` : item.beforeValue,
           afterValue: reason,
           responsiveReason: reason,
           responsiveReviewWidths: influence.reviewWidths,
@@ -7606,13 +7606,13 @@ ${htmlSlides}
   }
 
   function responsiveInfluence(node, context) {
-    const rulePart = context.responsiveRuleCount > 0 ? `${context.responsiveRuleCount} 条 @media/@container 规则` : "";
+    const rulePart = context.responsiveRuleCount > 0 ? `${context.responsiveRuleCount} @media/@container rule(s)` : "";
     const chainReason = responsiveLayoutChainReason(node);
     const matchesResponsiveRule = rulePart && nodeLikelyMatchesResponsiveSelector(node);
     let reason = null;
-    if (rulePart && chainReason) reason = `${rulePart}，且位于${chainReason}内`;
-    else if (chainReason) reason = `位于${chainReason}内`;
-    else if (matchesResponsiveRule) reason = `匹配页面中的${rulePart}`;
+    if (rulePart && chainReason) reason = `${rulePart}, and inside a ${chainReason}`;
+    else if (chainReason) reason = `inside a ${chainReason}`;
+    else if (matchesResponsiveRule) reason = `matches ${rulePart} on the page`;
     return {
       reason,
       layoutKind: chainReason,
@@ -7625,9 +7625,9 @@ ${htmlSlides}
     let current = node;
     while (current && current !== doc.documentElement) {
       const style = doc.defaultView.getComputedStyle(current);
-      if (style.display.includes("grid")) return current === node ? "网格布局对象" : "网格布局容器";
-      if (style.display.includes("flex")) return current === node ? "弹性布局对象" : "弹性布局容器";
-      if (style.position === "sticky") return current === node ? "粘性定位对象" : "粘性定位容器";
+      if (style.display.includes("grid")) return current === node ? "grid layout object" : "grid layout container";
+      if (style.display.includes("flex")) return current === node ? "flex layout object" : "flex layout container";
+      if (style.position === "sticky") return current === node ? "sticky layout object" : "sticky layout container";
       current = current.parentElement;
     }
     return null;
@@ -7707,8 +7707,8 @@ ${htmlSlides}
 
   function responsiveWidthSummary(widths) {
     const usable = (widths || []).filter((width) => Number.isFinite(Number(width)) && Number(width) > 0);
-    if (!usable.length) return "窄屏和宽屏";
-    return `断点附近宽度（${usable.slice(0, 4).join(" / ")}px）`;
+    if (!usable.length) return "narrow and wide layout widths";
+    return `layout widths near breakpoints (${usable.slice(0, 4).join(" / ")}px)`;
   }
 
   function countResponsiveLayoutNodes(doc) {
@@ -7857,6 +7857,11 @@ ${htmlSlides}
     return hasFill || hasBorder || hasRadius || hasShadow;
   }
 
+  // These `kind` values are internal protocol values shared with Swift. They are compared, not
+  // shown: the revert paths below and VisualChangeFilter/icon helpers on the Swift side match on
+  // them, and Swift maps them to English at the display boundary via VisualKindLabel. Changing a
+  // value here requires updating every consumer in this file, DeckModel.swift, ContentView.swift,
+  // and the visual-change tests together.
   function visualEntryChangeKind(before, after) {
     if (before.imageSource !== after.imageSource) return "图片";
     if (before.text !== after.text && !(before.childElementCount > 0 || after.childElementCount > 0)) return "文字";
@@ -7897,8 +7902,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "pptx-effect-risk",
         severity: "warning",
-        title: "PPTX 效果复核",
-        detail: `${count} 个对象含${reasonList}，导出 PPTX 后需复核高保真和可编辑程度`,
+        title: "PPTX effect review",
+        detail: `${count} object(s) contain ${reasonList}. Review fidelity and editability after PPTX export`,
         elementId: firstElementId
       });
     }
@@ -7910,16 +7915,16 @@ ${htmlSlides}
     if (!style) return null;
     const backgroundImage = String(style.backgroundImage || "").toLowerCase();
     if (backgroundImage && backgroundImage !== "none") {
-      if (backgroundImage.includes("url(")) return "背景图片";
-      if (/(radial|conic|repeating)-gradient\(/.test(backgroundImage)) return "复杂渐变";
+      if (backgroundImage.includes("url(")) return "a background image";
+      if (/(radial|conic|repeating)-gradient\(/.test(backgroundImage)) return "a complex gradient";
     }
 
-    if (hasNonNoneStyleValue(style.filter)) return "滤镜";
-    if (hasNonNoneStyleValue(style.backdropFilter) || hasNonNoneStyleValue(style.webkitBackdropFilter)) return "背景滤镜";
-    if (hasNonNoneStyleValue(style.clipPath)) return "裁切路径";
-    if (hasNonNoneStyleValue(style.maskImage) || hasNonNoneStyleValue(style.webkitMaskImage)) return "蒙版";
-    if (style.mixBlendMode && style.mixBlendMode !== "normal") return "混合模式";
-    if (style.transform && style.transform.toLowerCase().startsWith("matrix3d(")) return "3D 变换";
+    if (hasNonNoneStyleValue(style.filter)) return "a filter";
+    if (hasNonNoneStyleValue(style.backdropFilter) || hasNonNoneStyleValue(style.webkitBackdropFilter)) return "a backdrop filter";
+    if (hasNonNoneStyleValue(style.clipPath)) return "a clip path";
+    if (hasNonNoneStyleValue(style.maskImage) || hasNonNoneStyleValue(style.webkitMaskImage)) return "a mask";
+    if (style.mixBlendMode && style.mixBlendMode !== "normal") return "a blend mode";
+    if (style.transform && style.transform.toLowerCase().startsWith("matrix3d(")) return "a 3D transform";
     return null;
   }
 
@@ -7952,8 +7957,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "text-overflow",
         severity: "error",
-        title: "文字溢出",
-        detail: truncateDiagnosticText(normalizedText(node), "文本超出当前框"),
+        title: "Text overflow",
+        detail: truncateDiagnosticText(normalizedText(node), "The text overflows its box"),
         elementId
       });
     }
@@ -7979,8 +7984,8 @@ ${htmlSlides}
       addDiagnosticIssue(issues, {
         kind: "out-of-bounds",
         severity: "error",
-        title: "元素越界",
-        detail: `${diagnosticNodeLabel(node)} 超出可视容器 ${Math.round(overflow)}px`,
+        title: "Element out of bounds",
+        detail: `${diagnosticNodeLabel(node)} overflows its visible container by ${Math.round(overflow)}px`,
         elementId
       });
     }
@@ -8023,8 +8028,8 @@ ${htmlSlides}
         addDiagnosticIssue(issues, {
           kind: "overlap",
           severity: "warning",
-          title: "元素重叠",
-          detail: `${diagnosticNodeLabel(first)} 与 ${diagnosticNodeLabel(second)} 重叠`,
+          title: "Elements overlap",
+          detail: `${diagnosticNodeLabel(first)} overlaps ${diagnosticNodeLabel(second)}`,
           elementId
         });
       }
@@ -8249,7 +8254,7 @@ ${htmlSlides}
 
   function setSelectedHTMLText(text) {
     if (editorMode !== "html" || !directSelectedNode) return null;
-    pushHistory({ label: "修改文字" });
+    pushHistory({ label: "Edit text" });
     directSelectedNode.textContent = text;
     updateSelectionBox();
     scheduleHTMLTreeChanged();

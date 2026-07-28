@@ -60,7 +60,7 @@ struct WebEditorView: NSViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             Task { @MainActor in
                 guard let model else { return }
-                model.status = model.hasOpenDocument ? "编辑器已就绪" : "打开项目或拖入 HTML 文件开始"
+                model.status = model.hasOpenDocument ? "Editor ready" : "Open a project or drop in an HTML file to start"
             }
         }
     }

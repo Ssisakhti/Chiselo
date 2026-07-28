@@ -136,17 +136,17 @@ private struct BrowserTabBar: View {
 
             Spacer(minLength: 8)
 
-            Label("拖入打开", systemImage: "tray.and.arrow.down")
+            Label("Drop to Open", systemImage: "tray.and.arrow.down")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(MaterialTheme.muted)
                 .padding(.trailing, 14)
-                .help("可将 HTML 文件拖到窗口任意位置")
+                .help("Drop an HTML file anywhere in the window")
 
             Image(systemName: "arrow.left.and.right")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(MaterialTheme.muted.opacity(0.82))
                 .padding(.trailing, 14)
-                .help("拖动分隔线可调整左右栏")
+                .help("Drag the divider to resize the side panels")
         }
         .frame(height: 44)
         .background(.ultraThinMaterial)
@@ -188,7 +188,7 @@ private struct BrowserTab: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
-            .help("关闭标签页")
+            .help("Close tab")
         }
         .padding(.leading, 10)
         .padding(.trailing, 5)
@@ -223,10 +223,10 @@ private struct DropOverlay: View {
                     Image(systemName: "tray.and.arrow.down")
                         .font(.system(size: 42, weight: .semibold))
                         .foregroundStyle(MaterialTheme.primary)
-                    Text("拖入 HTML 文件，在新标签页打开")
+                    Text("Drop in an HTML file to open it in a new tab")
                         .font(.system(size: 19, weight: .heavy, design: .rounded))
                         .foregroundStyle(MaterialTheme.ink)
-                    Text("HTML / Chiselo 项目文件")
+                    Text("HTML / Chiselo project file")
                         .font(.system(size: 11, weight: .heavy))
                         .tracking(1.4)
                         .foregroundStyle(MaterialTheme.primaryDark)
@@ -252,11 +252,11 @@ private struct WelcomeStartView: View {
                 .foregroundStyle(MaterialTheme.primary)
 
             VStack(spacing: 7) {
-                Text("打开一个项目开始")
+                Text("Open a project to start")
                     .font(.system(size: 28, weight: .heavy, design: .rounded))
                     .foregroundStyle(MaterialTheme.ink)
 
-                Text("打开 HTML、Chiselo 项目，或直接把文件拖进窗口。")
+                Text("Open an HTML file or Chiselo project, or drop a file into the window.")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(MaterialTheme.muted)
                     .multilineTextAlignment(.center)
@@ -265,13 +265,13 @@ private struct WelcomeStartView: View {
             Button {
                 model.openDeck()
             } label: {
-                Label("打开项目", systemImage: "folder")
+                Label("Open Project", systemImage: "folder")
             }
             .buttonStyle(MaterialButtonStyle(filled: true))
             .keyboardShortcut("o", modifiers: .command)
 
             VStack(spacing: 6) {
-                Text("支持 HTML、HTM、XHTML 和 Chiselo 项目文件")
+                Text("Supports HTML, HTM, XHTML, and Chiselo project files")
                     .font(.system(size: 11, weight: .heavy))
                     .tracking(1.1)
                     .foregroundStyle(MaterialTheme.primaryDark)
@@ -299,7 +299,7 @@ struct PreferencesView: View {
 
     var body: some View {
         Form {
-            Picker("编辑区背景", selection: backgroundBinding) {
+            Picker("Editor Backdrop", selection: backgroundBinding) {
                 ForEach(EditorModel.EditorBackdrop.allCases) { backdrop in
                     Label(backdrop.title, systemImage: backdrop.iconName)
                         .tag(backdrop)
@@ -307,7 +307,7 @@ struct PreferencesView: View {
             }
             .pickerStyle(.segmented)
 
-            Text("背景只影响编辑工作区，不会写入导出的 HTML、PDF 或 PPTX。")
+            Text("The backdrop affects only the editing workspace. It is never written into exported HTML, PDF, or PPTX.")
                 .font(.caption)
                 .foregroundStyle(MaterialTheme.muted)
         }
@@ -340,7 +340,7 @@ private struct AppToolbar: View {
                 Text("Chiselo")
                     .font(.system(size: 22, weight: .heavy, design: .rounded))
                     .foregroundStyle(MaterialTheme.ink)
-                Text("HTML精修 · 交付预检")
+                Text("HTML Refine · Delivery Preflight")
                     .font(.system(size: 10, weight: .bold))
                     .tracking(0.6)
                     .foregroundStyle(MaterialTheme.primary)
@@ -348,52 +348,52 @@ private struct AppToolbar: View {
             .frame(width: 196, alignment: .leading)
 
             ToolbarCommandGroup {
-                ToolbarActionButton(title: "打开", icon: "folder") {
+                ToolbarActionButton(title: "Open", icon: "folder") {
                     model.openDeck()
                 }
-                .help("打开 HTML、HTM、XHTML 或 Chiselo 项目文件")
+                .help("Open an HTML, HTM, XHTML, or Chiselo project file")
 
-                ToolbarActionButton(title: "保存", icon: "square.and.arrow.down") {
+                ToolbarActionButton(title: "Save", icon: "square.and.arrow.down") {
                     model.saveDeck()
                 }
                 .disabled(!model.hasOpenDocument)
-                .help("保存当前文件，并在覆盖前生成版本快照")
+                .help("Save the current file, writing a version snapshot before overwriting")
 
-                ToolbarActionButton(title: "备份", icon: "clock.arrow.circlepath") {
+                ToolbarActionButton(title: "Backup", icon: "clock.arrow.circlepath") {
                     model.revealSafetyFolder()
                 }
                 .disabled(!model.canRevealSafetyFolder)
-                .help("打开当前文件的 Chiselo 版本快照目录")
+                .help("Open the Chiselo version snapshot folder for this file")
 
-                ToolbarActionButton(title: "恢复", icon: "arrow.counterclockwise.circle") {
+                ToolbarActionButton(title: "Restore", icon: "arrow.counterclockwise.circle") {
                     model.presentHistoryBrowser()
                 }
                 .disabled(!model.canRevealSafetyFolder)
-                .help("浏览 Chiselo 版本快照并恢复指定版本")
+                .help("Browse Chiselo version snapshots and restore a specific version")
             }
 
             MaterialDivider()
 
-            ToolbarActionButton(title: "转为可编辑版", icon: "viewfinder") {
+            ToolbarActionButton(title: "Convert to Editable", icon: "viewfinder") {
                 model.freezeCurrentHTMLLayout()
             }
             .disabled(!model.hasOpenDocument)
-            .help("捕获当前渲染结果，转换为可拖拽、可改字、可替换图片的稳定编辑版")
+            .help("Capture the current rendering as a stable editable version with draggable objects, editable text, and replaceable images")
 
             MaterialDivider()
 
             ToolbarCommandGroup {
-                ToolbarIconButton(icon: "arrow.uturn.backward", title: "撤销") {
+                ToolbarIconButton(icon: "arrow.uturn.backward", title: "Undo") {
                     model.editorCommand("undo")
                 }
                 .disabled(!model.hasOpenDocument || !model.canUndoEdit)
-                .help(model.nextUndoLabel.map { "撤销：\($0)" } ?? "没有可撤销的编辑")
+                .help(model.nextUndoLabel.map { "Undo: \($0)" } ?? "Nothing to undo")
 
-                ToolbarIconButton(icon: "arrow.uturn.forward", title: "重做") {
+                ToolbarIconButton(icon: "arrow.uturn.forward", title: "Redo") {
                     model.editorCommand("redo")
                 }
                 .disabled(!model.hasOpenDocument || !model.canRedoEdit)
-                .help(model.nextRedoLabel.map { "重做：\($0)" } ?? "没有可重做的编辑")
+                .help(model.nextRedoLabel.map { "Redo: \($0)" } ?? "Nothing to redo")
             }
 
             MaterialDivider()
@@ -417,7 +417,7 @@ private struct AppToolbar: View {
                     RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
                         .stroke(MaterialTheme.separator, lineWidth: 1)
                 )
-                .help(model.documentMode == "html" ? "精修当前 HTML 页面/文档" : "在固定画布中精修当前内容")
+                .help(model.documentMode == "html" ? "Refine the current HTML page or document" : "Refine the current content on a fixed canvas")
         }
         .buttonStyle(MaterialButtonStyle())
         .padding(.horizontal, MaterialTheme.panelPadding)
@@ -434,8 +434,8 @@ private struct AppToolbar: View {
     }
 
     private var modeBadgeTitle: String {
-        guard model.hasOpenDocument else { return "准备开始" }
-        return model.documentMode == "html" ? "页面精修" : "画布精修"
+        guard model.hasOpenDocument else { return "Ready to start" }
+        return model.documentMode == "html" ? "Page Refine" : "Canvas Refine"
     }
 }
 
@@ -452,11 +452,11 @@ private struct BackdropMenu: View {
                 }
             }
         } label: {
-            Label("背景", systemImage: "square.grid.3x3")
+            Label("Backdrop", systemImage: "square.grid.3x3")
         }
         .menuStyle(.button)
         .buttonStyle(MaterialButtonStyle())
-        .help("切换编辑区背景")
+        .help("Switch the editor backdrop")
     }
 }
 
@@ -506,7 +506,7 @@ private struct ExportMenu: View {
                 model.presentExportPreflight()
             } label: {
                 ExportMenuItemLabel(
-                    title: "导出预检",
+                    title: "Export Preflight",
                     subtitle: preflightSubtitle,
                     icon: preflightIcon
                 )
@@ -518,8 +518,8 @@ private struct ExportMenu: View {
                 model.exportHTML()
             } label: {
                 ExportMenuItemLabel(
-                    title: "导出 HTML",
-                    subtitle: "保持源码洁净，适合继续修改",
+                    title: "Export HTML",
+                    subtitle: "Keeps the source clean for further editing",
                     icon: "doc.text"
                 )
             }
@@ -528,8 +528,8 @@ private struct ExportMenu: View {
                 model.exportEditableHTML()
             } label: {
                 ExportMenuItemLabel(
-                    title: "可编辑 HTML",
-                    subtitle: "浏览器内可直接改文字",
+                    title: "Editable HTML",
+                    subtitle: "Text can be edited directly in the browser",
                     icon: "pencil.and.outline"
                 )
             }
@@ -540,8 +540,8 @@ private struct ExportMenu: View {
                 model.exportPDF()
             } label: {
                 ExportMenuItemLabel(
-                    title: "高保真 PDF",
-                    subtitle: "按浏览器渲染结果分页输出",
+                    title: "High-Fidelity PDF",
+                    subtitle: "Paginated from the browser rendering",
                     icon: "doc.richtext"
                 )
             }
@@ -550,22 +550,22 @@ private struct ExportMenu: View {
                 model.exportPPTX()
             } label: {
                 ExportMenuItemLabel(
-                    title: "可编辑 PPTX",
-                    subtitle: "作为可编辑 Office 交付格式",
+                    title: "Editable PPTX",
+                    subtitle: "An editable Office delivery format",
                     icon: "rectangle.on.rectangle.angled"
                 )
             }
         } label: {
-            Label("导出", systemImage: "square.and.arrow.up")
+            Label("Export", systemImage: "square.and.arrow.up")
         }
         .menuStyle(.button)
         .buttonStyle(MaterialButtonStyle(filled: true))
         .disabled(!model.hasOpenDocument)
-        .help("从 HTML 主资产导出 HTML、PDF 或可编辑 PPTX")
+        .help("Export HTML, PDF, or editable PPTX from the HTML master asset")
     }
 
     private var preflightSubtitle: String {
-        guard model.documentMode == "html" else { return "检查页面、对象和导出格式" }
+        guard model.documentMode == "html" else { return "Check pages, objects, and export formats" }
         return model.htmlDiagnostics.preflightSummary
     }
 
@@ -608,7 +608,7 @@ private struct ExportPreflightPanel: View {
                     .background(headerColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("导出预检")
+                    Text("Export Preflight")
                         .font(.system(size: 22, weight: .heavy, design: .rounded))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(headerSubtitle)
@@ -621,7 +621,7 @@ private struct ExportPreflightPanel: View {
                 Button {
                     model.refreshHTMLDiagnostics()
                 } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(MaterialButtonStyle())
                 .disabled(model.documentMode != "html")
@@ -643,7 +643,7 @@ private struct ExportPreflightPanel: View {
             Divider()
 
             HStack(spacing: 10) {
-                Button("关闭") {
+                Button("Close") {
                     dismiss()
                 }
                 .buttonStyle(MaterialButtonStyle())
@@ -653,21 +653,21 @@ private struct ExportPreflightPanel: View {
                 Button {
                     closeThen { model.exportHTML() }
                 } label: {
-                    Label("导出 HTML", systemImage: "doc.text")
+                    Label("Export HTML", systemImage: "doc.text")
                 }
                 .buttonStyle(MaterialButtonStyle())
 
                 Button {
                     closeThen { model.exportPDF() }
                 } label: {
-                    Label("导出 PDF", systemImage: "doc.richtext")
+                    Label("Export PDF", systemImage: "doc.richtext")
                 }
                 .buttonStyle(MaterialButtonStyle())
 
                 Button {
                     closeThen { model.exportPPTX() }
                 } label: {
-                    Label("导出 PPTX", systemImage: "rectangle.on.rectangle.angled")
+                    Label("Export PPTX", systemImage: "rectangle.on.rectangle.angled")
                 }
                 .buttonStyle(MaterialButtonStyle(filled: true))
             }
@@ -684,7 +684,7 @@ private struct ExportPreflightPanel: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ExportTargetScoreCard(
                     title: "HTML",
-                    subtitle: "源码洁净度 \(diagnostics.sourceCleanlinessPercent)%",
+                    subtitle: "Source cleanliness \(diagnostics.sourceCleanlinessPercent)%",
                     score: diagnostics.htmlReadinessScore,
                     icon: "doc.text",
                     detail: diagnostics.sourceCleanlinessDetail,
@@ -693,16 +693,16 @@ private struct ExportPreflightPanel: View {
 
                 ExportTargetScoreCard(
                     title: "PDF",
-                    subtitle: "高保真渲染",
+                    subtitle: "High-fidelity rendering",
                     score: diagnostics.pdfFidelityScore,
                     icon: "doc.richtext",
-                    detail: "PDF 以浏览器渲染为准，重点复查断链、越界和文字溢出。",
+                    detail: "PDF follows the browser rendering. Focus on broken links, out-of-bounds objects, and text overflow.",
                     color: scoreColor(diagnostics.pdfFidelityScore)
                 )
 
                 ExportTargetScoreCard(
                     title: "PPTX",
-                    subtitle: "可编辑性 \(diagnostics.pptxEditabilityScore)%",
+                    subtitle: "Editability \(diagnostics.pptxEditabilityScore)%",
                     score: diagnostics.pptxEditabilityScore,
                     icon: "rectangle.on.rectangle.angled",
                     detail: diagnostics.pptxRiskSummary,
@@ -767,7 +767,7 @@ private struct ExportPreflightPanel: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("问题定位")
+                Text("Issue Locator")
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
 
@@ -784,7 +784,7 @@ private struct ExportPreflightPanel: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.seal.fill")
                             .foregroundStyle(successColor)
-                        Text("没有发现阻碍交付的问题。")
+                        Text("No delivery-blocking issues found.")
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(MaterialTheme.muted)
                     }
@@ -794,16 +794,16 @@ private struct ExportPreflightPanel: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("PPTX 复核提示")
+                Text("PPTX Review Notes")
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
 
-                PreflightNoteRow(icon: "rectangle.2.swap", title: "视觉变更", detail: (diagnostics.visualChangeCount ?? 0) > 0 ? "\(diagnostics.visualChangeCount ?? 0) 个对象相对打开时发生变化，导出前建议逐项复核。" : "当前画面与打开时未检测到明显对象级变化。")
-                PreflightNoteRow(icon: "rectangle.split.3x1", title: "响应式", detail: diagnostics.responsiveReviewDetail)
-                PreflightNoteRow(icon: "tablecells", title: "表格", detail: diagnostics.spanTableCount > 0 ? "合并单元格会降低 PPTX 对象映射稳定性。" : "普通表格仍建议导出后抽查行列和文字框。")
-                PreflightNoteRow(icon: "scribble.variable", title: "矢量/SVG", detail: diagnostics.svgCount > 0 ? "SVG 或复杂矢量可能会转成形状或图片，需要复核可编辑程度。" : "未检测到明显 SVG 风险。")
-                PreflightNoteRow(icon: "camera.filters", title: "视觉效果", detail: (diagnostics.pptxEffectRiskCount ?? 0) > 0 ? "\(diagnostics.pptxEffectRiskCount ?? 0) 个复杂 CSS 效果导出 PPTX 后需要复核。" : "未检测到明显复杂 CSS 效果风险。")
-                PreflightNoteRow(icon: "square.stack.3d.up", title: "层叠", detail: (diagnostics.overlapCount ?? 0) > 0 ? "重叠对象导出 PPTX 后要检查层级顺序。" : "未检测到明显重叠风险。")
+                PreflightNoteRow(icon: "rectangle.2.swap", title: "Visual Changes", detail: (diagnostics.visualChangeCount ?? 0) > 0 ? "\(diagnostics.visualChangeCount ?? 0) object(s) changed since the file was opened. Review them one by one before exporting." : "No significant object-level changes detected since the file was opened.")
+                PreflightNoteRow(icon: "rectangle.split.3x1", title: "Responsive", detail: diagnostics.responsiveReviewDetail)
+                PreflightNoteRow(icon: "tablecells", title: "Tables", detail: diagnostics.spanTableCount > 0 ? "Merged cells reduce PPTX object mapping stability." : "Even simple tables are worth spot-checking rows, columns, and text boxes after export.")
+                PreflightNoteRow(icon: "scribble.variable", title: "Vector/SVG", detail: diagnostics.svgCount > 0 ? "SVG or complex vector art may convert to shapes or images. Review how editable it stays." : "No significant SVG risk detected.")
+                PreflightNoteRow(icon: "camera.filters", title: "Visual Effects", detail: (diagnostics.pptxEffectRiskCount ?? 0) > 0 ? "\(diagnostics.pptxEffectRiskCount ?? 0) complex CSS effect(s) need review after PPTX export." : "No significant complex CSS effect risk detected.")
+                PreflightNoteRow(icon: "square.stack.3d.up", title: "Layering", detail: (diagnostics.overlapCount ?? 0) > 0 ? "Check the stacking order of overlapping objects after PPTX export." : "No significant overlap risk detected.")
             }
         }
     }
@@ -815,26 +815,26 @@ private struct ExportPreflightPanel: View {
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                 ExportTargetScoreCard(
                     title: "HTML",
-                    subtitle: "画布导出",
+                    subtitle: "Canvas export",
                     score: 96,
                     icon: "doc.text",
-                    detail: "当前内容已经是固定画布，HTML 导出风险较低。",
+                    detail: "The content is already a fixed canvas, so HTML export risk is low.",
                     color: scoreColor(96)
                 )
                 ExportTargetScoreCard(
                     title: "PDF",
-                    subtitle: "页面渲染",
+                    subtitle: "Page rendering",
                     score: 96,
                     icon: "doc.richtext",
-                    detail: "PDF 会按页面尺寸渲染，适合高保真交付。",
+                    detail: "PDF renders at page size, which suits high-fidelity delivery.",
                     color: scoreColor(96)
                 )
                 ExportTargetScoreCard(
                     title: "PPTX",
-                    subtitle: editableSummary.map { "可编辑性 \($0.pptxEditabilityScore)%" } ?? "对象可编辑",
+                    subtitle: editableSummary.map { "Editability \($0.pptxEditabilityScore)%" } ?? "Objects editable",
                     score: editableSummary?.pptxEditabilityScore ?? 90,
                     icon: "rectangle.on.rectangle.angled",
-                    detail: editableSummary?.pptxDetail ?? "文本、图片和形状会尽量保留为可编辑对象。",
+                    detail: editableSummary?.pptxDetail ?? "Text, images, and shapes are kept as editable objects wherever possible.",
                     color: scoreColor(editableSummary?.pptxEditabilityScore ?? 90)
                 )
             }
@@ -844,12 +844,12 @@ private struct ExportPreflightPanel: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("当前页面结构")
+                Text("Current Page Structure")
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
-                PreflightNoteRow(icon: "rectangle.on.rectangle", title: "页面", detail: "\(model.documentStats.pageCount ?? 0) 页")
-                PreflightNoteRow(icon: "square.grid.2x2", title: "对象", detail: "\(model.documentStats.objectCount ?? 0) 个对象")
-                PreflightNoteRow(icon: "photo", title: "图片", detail: "\(model.documentStats.imageCount ?? 0) 张图片")
+                PreflightNoteRow(icon: "rectangle.on.rectangle", title: "Pages", detail: "\(model.documentStats.pageCount ?? 0) page(s)")
+                PreflightNoteRow(icon: "square.grid.2x2", title: "Objects", detail: "\(model.documentStats.objectCount ?? 0) object(s)")
+                PreflightNoteRow(icon: "photo", title: "Images", detail: "\(model.documentStats.imageCount ?? 0) image(s)")
             }
         }
     }
@@ -858,7 +858,7 @@ private struct ExportPreflightPanel: View {
         if model.documentMode == "html" {
             return model.htmlDiagnostics.preflightSummary
         }
-        return "固定画布可导出 HTML、PDF 和 PPTX"
+        return "A fixed canvas can export HTML, PDF, and PPTX"
     }
 
     private var headerColor: Color {
@@ -938,7 +938,7 @@ private struct PreflightRecommendationCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("导出建议")
+            Text("Export Guidance")
                 .font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(MaterialTheme.ink)
 
@@ -962,23 +962,23 @@ private struct PreflightRecommendationCard: View {
     private var recommendations: [(icon: String, text: String, color: Color)] {
         var items: [(String, String, Color)] = []
         if diagnostics.blockingExportRiskCount > 0 {
-            items.append(("exclamationmark.triangle.fill", "先处理红色问题，再导出正式版本。断链、文字溢出和越界会直接影响交付质量。", MaterialTheme.accentDanger))
+            items.append(("exclamationmark.triangle.fill", "Resolve the red issues before exporting a final version. Broken links, text overflow, and out-of-bounds objects directly affect delivery quality.", MaterialTheme.accentDanger))
         } else {
-            items.append(("checkmark.seal.fill", "HTML 和 PDF 可直接进入导出复核。重要文件仍建议打开导出结果抽查一遍。", Color(red: 0.06, green: 0.52, blue: 0.26)))
+            items.append(("checkmark.seal.fill", "HTML and PDF are ready for export review. For important files, still open the export and spot-check it.", Color(red: 0.06, green: 0.52, blue: 0.26)))
         }
 
         if diagnostics.pptxReviewRiskCount > 0 {
-            items.append(("rectangle.on.rectangle.angled", "导出可编辑 PPTX 时，表格、SVG、复杂视觉效果、重叠对象和合并单元格需要重点复核。", Color(red: 0.78, green: 0.47, blue: 0.06)))
+            items.append(("rectangle.on.rectangle.angled", "When exporting editable PPTX, pay close attention to tables, SVG, complex visual effects, overlapping objects, and merged cells.", Color(red: 0.78, green: 0.47, blue: 0.06)))
         } else {
-            items.append(("rectangle.on.rectangle.angled", "PPTX 可编辑性风险较低，可导出后检查文本框、图片和对象层级。", Color(red: 0.06, green: 0.52, blue: 0.26)))
+            items.append(("rectangle.on.rectangle.angled", "PPTX editability risk is low. After exporting, check text boxes, images, and object layering.", Color(red: 0.06, green: 0.52, blue: 0.26)))
         }
 
         if (diagnostics.visualChangeCount ?? 0) > 0 {
-            items.append(("rectangle.2.swap", "已检测到相对打开时的对象级视觉变化，导出前建议逐项确认改动范围是否符合预期。", Color(red: 0.78, green: 0.47, blue: 0.06)))
+            items.append(("rectangle.2.swap", "Object-level visual changes since opening were detected. Confirm the scope of each change before exporting.", Color(red: 0.78, green: 0.47, blue: 0.06)))
         }
 
         if diagnostics.runtimeCompatibilityRiskCount > 0 {
-            items.append(("viewfinder", "脚本渲染、嵌入页面或画布内容不一定能拆成普通对象。需要像交付稿一样稳定微调时，优先转为可编辑版再精修。", Color(red: 0.78, green: 0.47, blue: 0.06)))
+            items.append(("viewfinder", "Script-rendered content, embedded pages, and canvas regions cannot always be split into ordinary objects. For stable delivery-grade adjustment, convert to an editable version first.", Color(red: 0.78, green: 0.47, blue: 0.06)))
         }
         return items
     }
@@ -1010,7 +1010,7 @@ private struct VisualChangeReviewCard: View {
                     .background(warningColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("视觉变更复核")
+                    Text("Visual Change Review")
                         .font(.system(size: 13, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(visualChangeSubtitle(changeCount: changeCount, targetCount: targetIds.count))
@@ -1021,7 +1021,7 @@ private struct VisualChangeReviewCard: View {
                 Spacer()
             }
 
-            Text("导出前逐项确认改动范围，避免误改文字、图片、尺寸、位置或关键样式。")
+            Text("Confirm each change before exporting so text, images, size, position, and key styles are not altered by accident.")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(MaterialTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1067,7 +1067,7 @@ private struct VisualChangeReviewCard: View {
 
             if !targetIds.isEmpty {
                 PPTXTargetNavigator(
-                    title: selectedFilter == .all ? "视觉变更" : selectedFilter.title,
+                    title: selectedFilter == .all ? "Visual Changes" : selectedFilter.title,
                     icon: "rectangle.2.swap",
                     count: targetIds.count,
                     targetIds: targetIds,
@@ -1080,7 +1080,7 @@ private struct VisualChangeReviewCard: View {
                     Image(systemName: "minus.circle")
                         .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(MaterialTheme.muted)
-                    Text("这次变化主要来自已删除或无法定位的对象，请结合画面和历史版本复核。")
+                    Text("These changes come mostly from deleted or non-locatable objects. Review them against the canvas and Version History.")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(MaterialTheme.muted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1103,11 +1103,11 @@ private struct VisualChangeReviewCard: View {
 
     private func visualChangeSubtitle(changeCount: Int, targetCount: Int) -> String {
         let revertableCount = diagnostics.revertableVisualChangeCount ?? 0
-        let targetPart = targetCount == 0 ? "含不可定位对象" : "\(targetCount) 处可定位"
+        let targetPart = targetCount == 0 ? "includes non-locatable objects" : "\(targetCount) locatable"
         if revertableCount > 0 {
-            return "\(changeCount) 处变化，\(targetPart)，\(revertableCount) 处可一键回退"
+            return "\(changeCount) change(s), \(targetPart), \(revertableCount) revertable in one step"
         }
-        return "\(changeCount) 处变化，\(targetPart)"
+        return "\(changeCount) change(s), \(targetPart)"
     }
 }
 
@@ -1133,10 +1133,10 @@ private struct ResponsiveChangeReviewCard: View {
                     .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("响应式变更复核")
+                    Text("Responsive Change Review")
                         .font(.system(size: 13, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
-                    Text("\(count) 个已修改对象受响应式布局影响")
+                    Text("\(count) changed object(s) affected by responsive layout")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(color)
                 }
@@ -1184,7 +1184,7 @@ private struct ResponsiveChangeReviewCard: View {
                                         .font(.system(size: 11, weight: .heavy))
                                         .foregroundStyle(MaterialTheme.ink)
                                         .lineLimit(1)
-                                    Text(item.detail ?? item.kind)
+                                    Text(item.detail ?? item.kindDisplay)
                                         .font(.system(size: 10, weight: .semibold))
                                         .foregroundStyle(MaterialTheme.muted)
                                         .lineLimit(2)
@@ -1213,7 +1213,7 @@ private struct ResponsiveChangeReviewCard: View {
                     }
 
                     if count > items.prefix(5).count {
-                        Text("其余 \(count - items.prefix(5).count) 个响应式相关变化可通过定位器继续复核。")
+                        Text("The remaining \(count - items.prefix(5).count) responsive change(s) can be reviewed with the locator.")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(MaterialTheme.muted)
                     }
@@ -1224,7 +1224,7 @@ private struct ResponsiveChangeReviewCard: View {
 
             if !targetIds.isEmpty {
                 PPTXTargetNavigator(
-                    title: "响应式变化",
+                    title: "Responsive Changes",
                     icon: "rectangle.split.3x1",
                     count: count,
                     targetIds: targetIds,
@@ -1257,7 +1257,7 @@ private struct ResponsiveChangeReviewCard: View {
         }
         let widths = (item.responsiveReviewWidths ?? []).prefix(4)
         if !widths.isEmpty {
-            parts.append("宽度 \(widths.map { "\($0)" }.joined(separator: "/"))px")
+            parts.append("widths \(widths.map { "\($0)" }.joined(separator: "/"))px")
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
@@ -1289,7 +1289,7 @@ private struct SourceWritebackReviewCard: View {
                     .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("源码复核")
+                    Text("Source Review")
                         .font(.system(size: 13, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(sourceWritebackSubtitle(inlineCount: inlineItems.count, ruleCount: ruleCount, externalAffectedChanges: externalAffectedChanges))
@@ -1327,7 +1327,7 @@ private struct SourceWritebackReviewCard: View {
 
             if !targetIds.isEmpty {
                 PPTXTargetNavigator(
-                    title: "源码复核",
+                    title: "Source Review",
                     icon: "curlybraces.square",
                     count: inlineItems.count + ruleCount + externalAffectedChanges,
                     targetIds: targetIds,
@@ -1347,10 +1347,10 @@ private struct SourceWritebackReviewCard: View {
 
     private func sourceWritebackSubtitle(inlineCount: Int, ruleCount: Int, externalAffectedChanges: Int) -> String {
         var parts: [String] = []
-        if ruleCount > 0 { parts.append("\(ruleCount) 处写入 CSS 规则") }
-        if inlineCount > 0 { parts.append("\(inlineCount) 处写入 inline style") }
-        if externalAffectedChanges > 0 { parts.append("\(externalAffectedChanges) 处需复核外部 CSS") }
-        return parts.isEmpty ? "未检测到对象级源码风险" : parts.joined(separator: "，")
+        if ruleCount > 0 { parts.append("\(ruleCount) write(s) to CSS rules") }
+        if inlineCount > 0 { parts.append("\(inlineCount) write(s) to inline style") }
+        if externalAffectedChanges > 0 { parts.append("\(externalAffectedChanges) needing external CSS review") }
+        return parts.isEmpty ? "No object-level source risk detected" : parts.joined(separator: ", ")
     }
 }
 
@@ -1368,7 +1368,7 @@ private struct SourceWritebackSelectorList: View {
                 .background(Color(red: 0.06, green: 0.52, blue: 0.26).opacity(0.10), in: RoundedRectangle(cornerRadius: 5))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("CSS 规则")
+                Text("CSS Rules")
                     .font(.system(size: 11, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Text(selectorDetail)
@@ -1387,7 +1387,7 @@ private struct SourceWritebackSelectorList: View {
     private var selectorDetail: String {
         let visible = selectors.joined(separator: "、")
         let hidden = max(0, totalCount - selectors.count)
-        return hidden > 0 ? "\(visible)，另 \(hidden) 条规则" : visible
+        return hidden > 0 ? "\(visible), plus \(hidden) more rule(s)" : visible
     }
 }
 
@@ -1447,7 +1447,7 @@ private struct SourceWritebackRow: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(iconColor)
                 .background(iconColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-                .help("回退这处源码相关变更")
+                .help("Revert this source-related change")
             }
         }
     }
@@ -1455,20 +1455,20 @@ private struct SourceWritebackRow: View {
     private var detail: String {
         let prefix = writebackPrefix
         if let afterValue = item.afterValue, !afterValue.isEmpty {
-            return "\(prefix)：\(afterValue)"
+            return "\(prefix): \(afterValue)"
         }
-        return "\(prefix)：\(item.detail ?? item.kind)"
+        return "\(prefix): \(item.detail ?? item.kindDisplay)"
     }
 
     private var writebackPrefix: String {
         if item.writebackKind == "stylesheet-rule" {
             let target = (item.writebackTarget ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            return target.isEmpty ? "CSS 规则" : "CSS 规则 \(target)"
+            return target.isEmpty ? "CSS rule" : "CSS rule \(target)"
         }
         if item.writebackKind == "inline-style" {
             return "inline style"
         }
-        return item.writebackLabel ?? "源码"
+        return item.writebackLabel ?? "Source"
     }
 
     private var iconColor: Color {
@@ -1483,7 +1483,7 @@ private struct VisualChangeFilterPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Picker("变化类型", selection: $selection) {
+            Picker("Change Type", selection: $selection) {
                 ForEach(VisualChangeFilter.allCases) { filter in
                     Text("\(filter.title) \(count(for: filter))")
                         .tag(filter)
@@ -1491,7 +1491,7 @@ private struct VisualChangeFilterPicker: View {
             }
             .pickerStyle(.segmented)
 
-            Text(selection == .all ? "显示全部对象级变化。" : "仅显示\(selection.title)相关变化。")
+            Text(selection == .all ? "Showing all object-level changes." : "Showing only \(selection.title) changes.")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(MaterialTheme.muted)
         }
@@ -1512,7 +1512,7 @@ private struct VisualChangeEmptyFilter: View {
             Image(systemName: "line.3.horizontal.decrease.circle")
                 .font(.system(size: 11, weight: .heavy))
                 .foregroundStyle(MaterialTheme.muted)
-            Text("当前没有\(filter.title)类变化。")
+            Text("No \(filter.title) changes right now.")
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(MaterialTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1538,7 +1538,7 @@ private struct VisualSnapshotComparison: View {
                     .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("截图前后对照")
+                    Text("Before/After Screenshots")
                         .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(subtitle)
@@ -1559,33 +1559,33 @@ private struct VisualSnapshotComparison: View {
                 .foregroundStyle(color)
                 .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
                 .disabled(isCapturingSnapshot)
-                .help("刷新当前截图")
+                .help("Refresh the current screenshot")
             }
 
             if snapshots.hasImages {
                 LazyVGrid(columns: snapshotColumns, spacing: 8) {
-                    VisualSnapshotTile(title: "打开时", image: snapshots.baseline, color: color)
-                    VisualSnapshotTile(title: "当前", image: snapshots.current, color: color)
-                    VisualSnapshotTile(title: "差异热图", image: snapshots.diff?.heatmap, color: diffColor)
+                    VisualSnapshotTile(title: "At open", image: snapshots.baseline, color: color)
+                    VisualSnapshotTile(title: "Current", image: snapshots.current, color: color)
+                    VisualSnapshotTile(title: "Difference heatmap", image: snapshots.diff?.heatmap, color: diffColor)
                 }
 
                 if let diff = snapshots.diff {
                     HStack(spacing: 8) {
                         VisualDiffMetric(
                             value: percentText(diff.changedPixelRatio),
-                            label: "变化像素",
+                            label: "Changed pixels",
                             icon: "square.grid.3x3.fill",
                             color: diffColor
                         )
                         VisualDiffMetric(
                             value: percentText(diff.averageDelta),
-                            label: "平均差异",
+                            label: "Average difference",
                             icon: "waveform.path.ecg",
                             color: diffColor
                         )
                         VisualDiffMetric(
                             value: percentText(diff.maxDelta),
-                            label: "峰值差异",
+                            label: "Peak difference",
                             icon: "exclamationmark.triangle.fill",
                             color: diffColor
                         )
@@ -1596,7 +1596,7 @@ private struct VisualSnapshotComparison: View {
                     ProgressView()
                         .controlSize(.small)
                         .opacity(isCapturingSnapshot ? 1 : 0)
-                    Text(isCapturingSnapshot ? "正在捕获当前画面..." : "暂无截图，点击刷新捕获当前画面。")
+                    Text(isCapturingSnapshot ? "Capturing the current view..." : "No screenshot yet. Click Refresh to capture the current view.")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(MaterialTheme.muted)
                 }
@@ -1610,14 +1610,14 @@ private struct VisualSnapshotComparison: View {
     }
 
     private var subtitle: String {
-        if isCapturingSnapshot { return "正在刷新当前画面" }
+        if isCapturingSnapshot { return "Refreshing the current view" }
         if let diff = snapshots.diff {
-            return diff.hasMeaningfulChange ? "已生成截图差异热图" : "截图差异很轻微"
+            return diff.hasMeaningfulChange ? "Difference heatmap generated" : "Screenshot difference is very slight"
         }
-        if snapshots.baseline != nil && snapshots.current != nil { return "打开时与当前画面" }
-        if snapshots.baseline != nil { return "已保存打开时画面，等待当前截图" }
-        if snapshots.current != nil { return "当前画面已捕获" }
-        return "用于导出前人工对比"
+        if snapshots.baseline != nil && snapshots.current != nil { return "View at open vs. current" }
+        if snapshots.baseline != nil { return "Saved the view at open, waiting for a current screenshot" }
+        if snapshots.current != nil { return "Current view captured" }
+        return "For manual comparison before export"
     }
 
     private var snapshotColumns: [GridItem] {
@@ -1669,7 +1669,7 @@ private struct VisualSnapshotTile: View {
                     VStack(spacing: 5) {
                         Image(systemName: "photo")
                             .font(.system(size: 16, weight: .heavy))
-                        Text("未捕获")
+                        Text("Not captured")
                             .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(MaterialTheme.muted)
@@ -1729,7 +1729,7 @@ private struct VisualChangeMap: View {
                     .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("视觉变更地图")
+                    Text("Visual Change Map")
                         .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(mapSubtitle)
@@ -1787,9 +1787,9 @@ private struct VisualChangeMap: View {
 
     private var mapSubtitle: String {
         if items.count < totalCount {
-            return "显示前 \(items.count) / \(totalCount) 处热区"
+            return "Showing the first \(items.count) of \(totalCount) hotspots"
         }
-        return "\(totalCount) 处热区"
+        return "\(totalCount) hotspot(s)"
     }
 
     private var aspectRatio: CGFloat {
@@ -1809,7 +1809,7 @@ private struct VisualChangeMap: View {
             )
             .frame(width: rect.width, height: rect.height)
             .position(x: rect.midX, y: rect.midY)
-            .help(item.elementId == nil ? "\(item.kind)：\(item.label)" : "定位：\(item.kind) \(item.label)")
+            .help(item.elementId == nil ? "\(item.kindDisplay): \(item.label)" : "Locate: \(item.kindDisplay) \(item.label)")
 
         if let elementId = item.elementId {
             Button {
@@ -1860,12 +1860,12 @@ private struct VisualChangePreviewList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("变化清单")
+                Text("Change List")
                     .font(.system(size: 11, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Spacer(minLength: 0)
                 if totalCount > items.count {
-                    Text("前 \(items.count) 项")
+                    Text("First \(items.count)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(MaterialTheme.muted)
                 }
@@ -1876,7 +1876,7 @@ private struct VisualChangePreviewList: View {
             }
 
             if totalCount > previewCount {
-                Text("其余 \(totalCount - previewCount) 处变化未放入缩略预览，可通过逐项定位继续复核。")
+                Text("The remaining \(totalCount - previewCount) change(s) are not in the thumbnail preview. Use Step Through to review them.")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(MaterialTheme.muted)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1903,11 +1903,11 @@ private struct VisualChangePreviewRow: View {
                     .background(rowColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(item.label.isEmpty ? "对象" : item.label)
+                    Text(item.label.isEmpty ? "Object" : item.label)
                         .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                         .lineLimit(1)
-                    Text("\(item.kind) · x \(item.x), y \(item.y), \(item.w) x \(item.h)")
+                    Text("\(item.kindDisplay) · x \(item.x), y \(item.y), \(item.w) x \(item.h)")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(MaterialTheme.muted)
                         .lineLimit(1)
@@ -1928,11 +1928,11 @@ private struct VisualChangePreviewRow: View {
 
             if hasBeforeAfter {
                 HStack(spacing: 6) {
-                    VisualChangeValuePill(title: "打开时", value: item.beforeValue, color: MaterialTheme.muted)
+                    VisualChangeValuePill(title: "At open", value: item.beforeValue, color: MaterialTheme.muted)
                     Image(systemName: "arrow.right")
                         .font(.system(size: 8, weight: .heavy))
                         .foregroundStyle(MaterialTheme.muted)
-                    VisualChangeValuePill(title: "当前", value: item.afterValue, color: rowColor)
+                    VisualChangeValuePill(title: "Current", value: item.afterValue, color: rowColor)
                 }
             } else if let reason = item.revertReason, !(item.canRevert ?? false) {
                 Text(reason)
@@ -1957,7 +1957,7 @@ private struct VisualChangePreviewRow: View {
                 Button {
                     onRevertChange(changeKey)
                 } label: {
-                    Label("回退", systemImage: "arrow.uturn.backward")
+                    Label("Revert", systemImage: "arrow.uturn.backward")
                         .font(.system(size: 10, weight: .heavy))
                         .padding(.horizontal, 8)
                         .frame(height: 24)
@@ -1965,14 +1965,14 @@ private struct VisualChangePreviewRow: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(rowColor)
                 .background(rowColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-                .help("只回退这一处视觉变更")
+                .help("Revert only this visual change")
             }
 
             if let elementId = item.elementId {
                 Button {
                     onSelectTarget(elementId)
                 } label: {
-                    Label("定位", systemImage: "scope")
+                    Label("Locate", systemImage: "scope")
                         .font(.system(size: 10, weight: .heavy))
                         .padding(.horizontal, 8)
                         .frame(height: 24)
@@ -1980,9 +1980,9 @@ private struct VisualChangePreviewRow: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(rowColor)
                 .background(rowColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-                .help("定位这处变化")
+                .help("Locate this change")
             } else {
-                Text("不可定位")
+                Text("Not locatable")
                     .font(.system(size: 9, weight: .heavy))
                     .foregroundStyle(MaterialTheme.muted)
                     .padding(.horizontal, 7)
@@ -2035,7 +2035,7 @@ private struct VisualChangeValuePill: View {
 
     private var displayValue: String {
         let text = (value ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? "空" : text
+        return text.isEmpty ? "Empty" : text
     }
 }
 
@@ -2058,10 +2058,10 @@ private struct PPTXMappingReportCard: View {
                     .frame(width: 22, height: 22)
                     .background(reportColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("PPTX 可编辑对象")
+                    Text("PPTX Editable Objects")
                         .font(.system(size: 13, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
-                    Text("\(diagnostics.pptxEditableEstimate)% 预计可编辑")
+                    Text("\(diagnostics.pptxEditableEstimate)% estimated editable")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(reportColor)
                 }
@@ -2069,23 +2069,23 @@ private struct PPTXMappingReportCard: View {
             }
 
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                MappingMetric(value: "\(diagnostics.pptxTextObjectCount ?? 0)", label: "文字", icon: "textformat", elementId: diagnostics.pptxTextElementId, action: onSelectTarget)
-                MappingMetric(value: "\(diagnostics.pptxImageObjectCount ?? 0)", label: "图片", icon: "photo", elementId: diagnostics.pptxImageElementId, action: onSelectTarget)
-                MappingMetric(value: "\(diagnostics.pptxShapeObjectCount ?? 0)", label: "形状", icon: "square.on.circle", elementId: diagnostics.pptxShapeElementId, action: onSelectTarget)
-                MappingMetric(value: "\(diagnostics.pptxReviewObjectCount ?? 0)", label: "需复核", icon: "checklist", elementId: diagnostics.pptxReviewElementId, action: onSelectTarget)
-                MappingMetric(value: "\(diagnostics.pptxFallbackObjectCount ?? 0)", label: "整体对象", icon: "rectangle.dashed", elementId: diagnostics.pptxFallbackElementId, action: onSelectTarget)
-                MappingMetric(value: "\(diagnostics.pptxMappingTotalObjectCount)", label: "合计", icon: "square.grid.2x2")
+                MappingMetric(value: "\(diagnostics.pptxTextObjectCount ?? 0)", label: "Text", icon: "textformat", elementId: diagnostics.pptxTextElementId, action: onSelectTarget)
+                MappingMetric(value: "\(diagnostics.pptxImageObjectCount ?? 0)", label: "Images", icon: "photo", elementId: diagnostics.pptxImageElementId, action: onSelectTarget)
+                MappingMetric(value: "\(diagnostics.pptxShapeObjectCount ?? 0)", label: "Shapes", icon: "square.on.circle", elementId: diagnostics.pptxShapeElementId, action: onSelectTarget)
+                MappingMetric(value: "\(diagnostics.pptxReviewObjectCount ?? 0)", label: "Needs review", icon: "checklist", elementId: diagnostics.pptxReviewElementId, action: onSelectTarget)
+                MappingMetric(value: "\(diagnostics.pptxFallbackObjectCount ?? 0)", label: "Whole objects", icon: "rectangle.dashed", elementId: diagnostics.pptxFallbackElementId, action: onSelectTarget)
+                MappingMetric(value: "\(diagnostics.pptxMappingTotalObjectCount)", label: "Total", icon: "square.grid.2x2")
             }
 
             if let onSelectTarget, hasTargetNavigation {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("逐项定位")
+                    Text("Step Through")
                         .font(.system(size: 11, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
 
                     if diagnostics.pptxTextTargetIds.count > 1 {
                         PPTXTargetNavigator(
-                            title: "文字",
+                            title: "Text",
                             icon: "textformat",
                             count: diagnostics.pptxTextObjectCount ?? 0,
                             targetIds: diagnostics.pptxTextTargetIds,
@@ -2097,7 +2097,7 @@ private struct PPTXMappingReportCard: View {
 
                     if diagnostics.pptxImageTargetIds.count > 1 {
                         PPTXTargetNavigator(
-                            title: "图片",
+                            title: "Images",
                             icon: "photo",
                             count: diagnostics.pptxImageObjectCount ?? 0,
                             targetIds: diagnostics.pptxImageTargetIds,
@@ -2109,7 +2109,7 @@ private struct PPTXMappingReportCard: View {
 
                     if diagnostics.pptxShapeTargetIds.count > 1 {
                         PPTXTargetNavigator(
-                            title: "形状",
+                            title: "Shapes",
                             icon: "square.on.circle",
                             count: diagnostics.pptxShapeObjectCount ?? 0,
                             targetIds: diagnostics.pptxShapeTargetIds,
@@ -2121,7 +2121,7 @@ private struct PPTXMappingReportCard: View {
 
                     if !diagnostics.pptxReviewTargetIds.isEmpty {
                         PPTXTargetNavigator(
-                            title: "需复核",
+                            title: "Needs review",
                             icon: "checklist",
                             count: diagnostics.pptxReviewObjectCount ?? 0,
                             targetIds: diagnostics.pptxReviewTargetIds,
@@ -2133,7 +2133,7 @@ private struct PPTXMappingReportCard: View {
 
                     if !diagnostics.pptxFallbackTargetIds.isEmpty {
                         PPTXTargetNavigator(
-                            title: "整体对象",
+                            title: "Whole objects",
                             icon: "rectangle.dashed",
                             count: diagnostics.pptxFallbackObjectCount ?? 0,
                             targetIds: diagnostics.pptxFallbackTargetIds,
@@ -2206,7 +2206,7 @@ private struct MappingMetric: View {
         )
         .lineLimit(1)
         .minimumScaleFactor(0.72)
-        .help(isActionable ? "点击定位第一处\(label)" : "\(label)统计")
+        .help(isActionable ? "Click to locate the first \(label)" : "\(label) count")
     }
 
     private var content: some View {
@@ -2251,7 +2251,7 @@ private struct PPTXTargetNavigator: View {
                 Text(title)
                     .font(.system(size: 11, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
-                Text("\(currentIndex + 1)/\(max(targetIds.count, 1)) 可定位，合计 \(count)")
+                Text("\(currentIndex + 1)/\(max(targetIds.count, 1)) locatable, \(count) total")
                     .font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(MaterialTheme.muted)
             }
@@ -2267,19 +2267,19 @@ private struct PPTXTargetNavigator: View {
             }
             .buttonStyle(.plain)
             .disabled(targetIds.count <= 1)
-            .help("上一处\(title)")
+            .help("Previous \(title)")
 
             Button {
                 onSelectTarget(targetIds[currentIndex])
             } label: {
-                Label("定位", systemImage: "scope")
+                Label("Locate", systemImage: "scope")
                     .font(.system(size: 10, weight: .heavy))
                     .padding(.horizontal, 8)
                     .frame(height: 24)
             }
             .buttonStyle(.plain)
             .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
-            .help("定位当前\(title)")
+            .help("Locate current \(title)")
 
             Button {
                 move(1)
@@ -2290,7 +2290,7 @@ private struct PPTXTargetNavigator: View {
             }
             .buttonStyle(.plain)
             .disabled(targetIds.count <= 1)
-            .help("下一处\(title)")
+            .help("Next \(title)")
         }
         .foregroundStyle(MaterialTheme.primaryDark)
         .padding(.horizontal, 8)
@@ -2326,7 +2326,7 @@ private struct PPTXRepairActionCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("建议操作")
+            Text("Suggested Actions")
                 .font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(MaterialTheme.ink)
 
@@ -2334,10 +2334,10 @@ private struct PPTXRepairActionCard: View {
                 if diagnostics.tableCount > 0 {
                     PPTXRepairActionRow(
                         icon: diagnostics.spanTableCount > 0 ? "tablecells.badge.ellipsis" : "tablecells",
-                        title: "复核表格",
-                        detail: diagnostics.spanTableCount > 0 ? "\(diagnostics.tableCount) 个表格，含合并单元格" : "\(diagnostics.tableCount) 个表格",
+                        title: "Review Tables",
+                        detail: diagnostics.spanTableCount > 0 ? "\(diagnostics.tableCount) table(s), with merged cells" : "\(diagnostics.tableCount) table(s)",
                         color: warningColor,
-                        buttonTitle: "定位"
+                        buttonTitle: "Locate"
                     ) {
                         if let elementId = diagnostics.tableElementId {
                             onSelectTarget(elementId)
@@ -2349,10 +2349,10 @@ private struct PPTXRepairActionCard: View {
                 if diagnostics.svgCount > 0 {
                     PPTXRepairActionRow(
                         icon: "scribble.variable",
-                        title: "复核矢量",
-                        detail: "\(diagnostics.svgCount) 个 SVG/矢量对象",
+                        title: "Review Vectors",
+                        detail: "\(diagnostics.svgCount) SVG/vector object(s)",
                         color: warningColor,
-                        buttonTitle: "定位"
+                        buttonTitle: "Locate"
                     ) {
                         if let elementId = diagnostics.svgElementId {
                             onSelectTarget(elementId)
@@ -2364,10 +2364,10 @@ private struct PPTXRepairActionCard: View {
                 if (diagnostics.pptxEffectRiskCount ?? 0) > 0 {
                     PPTXRepairActionRow(
                         icon: "camera.filters",
-                        title: "复核效果",
-                        detail: "\(diagnostics.pptxEffectRiskCount ?? 0) 个复杂视觉效果",
+                        title: "Review Effects",
+                        detail: "\(diagnostics.pptxEffectRiskCount ?? 0) complex visual effect(s)",
                         color: warningColor,
-                        buttonTitle: "定位"
+                        buttonTitle: "Locate"
                     ) {
                         if let elementId = diagnostics.pptxEffectRiskElementId {
                             onSelectTarget(elementId)
@@ -2379,10 +2379,10 @@ private struct PPTXRepairActionCard: View {
                 if (diagnostics.overlapCount ?? 0) > 0 {
                     PPTXRepairActionRow(
                         icon: "square.stack.3d.up",
-                        title: "复核层叠",
-                        detail: "\(diagnostics.overlapCount ?? 0) 处重叠对象",
+                        title: "Review Layering",
+                        detail: "\(diagnostics.overlapCount ?? 0) overlapping object(s)",
                         color: warningColor,
-                        buttonTitle: "定位"
+                        buttonTitle: "Locate"
                     ) {
                         if let elementId = diagnostics.overlapElementId {
                             onSelectTarget(elementId)
@@ -2394,10 +2394,10 @@ private struct PPTXRepairActionCard: View {
                 if diagnostics.shouldOfferEditableConversion {
                     PPTXRepairActionRow(
                         icon: "viewfinder",
-                        title: "转为可编辑版",
+                        title: "Convert to Editable Version",
                         detail: diagnostics.runtimeCompatibilityDetail,
                         color: MaterialTheme.primary,
-                        buttonTitle: "转换"
+                        buttonTitle: "Convert"
                     ) {
                         onConvertEditable()
                     }
@@ -2406,10 +2406,10 @@ private struct PPTXRepairActionCard: View {
                 if diagnostics.shouldOfferPDFFallback {
                     PPTXRepairActionRow(
                         icon: "doc.richtext",
-                        title: "保真交付",
-                        detail: "视觉一致优先时使用 PDF",
+                        title: "Fidelity Delivery",
+                        detail: "Use PDF when visual consistency matters most",
                         color: Color(red: 0.06, green: 0.52, blue: 0.26),
-                        buttonTitle: "导出PDF"
+                        buttonTitle: "Export PDF"
                     ) {
                         onExportPDF()
                     }
@@ -2521,31 +2521,31 @@ private struct EditableVersionSummary: Equatable {
 
     var fallbackDetail: String {
         if wholeObjectCount == 0 {
-            return "无整体 fallback 对象"
+            return "No whole-object fallbacks"
         }
 
         var parts: [String] = []
-        if iframeFallbackCount > 0 { parts.append("\(iframeFallbackCount) 个嵌入页面") }
-        if canvasFallbackCount > 0 { parts.append("\(canvasFallbackCount) 个画布") }
+        if iframeFallbackCount > 0 { parts.append("\(iframeFallbackCount) embedded page(s)") }
+        if canvasFallbackCount > 0 { parts.append("\(canvasFallbackCount) canvas region(s)") }
         let other = wholeObjectCount - iframeFallbackCount - canvasFallbackCount
-        if other > 0 { parts.append("\(other) 个媒体/嵌入对象") }
+        if other > 0 { parts.append("\(other) media/embedded object(s)") }
         return parts.joined(separator: "，")
     }
 
     var pptxDetail: String {
         if pptxEditabilityScore >= 85 {
-            return "文本、图片和形状占比较高，PPTX 可编辑性较好。"
+            return "Text, images, and shapes dominate, so PPTX editability is good."
         }
         if pptxEditabilityScore >= 65 {
-            return "存在近似或整体对象，PPTX 导出后需要重点复核对象层级。"
+            return "Approximated or whole objects are present, so review object layering closely after PPTX export."
         }
-        return "整体 fallback 较多，PPTX 更适合复核版式，不宜期待完全可拆编辑。"
+        return "There are many whole-object fallbacks. PPTX suits layout review rather than fully separable editing."
     }
 
     var qualityTitle: String {
-        if pptxEditabilityScore >= 85 { return "可编辑性较好" }
-        if pptxEditabilityScore >= 65 { return "可编辑性中等" }
-        return "需要复核"
+        if pptxEditabilityScore >= 85 { return "Good editability" }
+        if pptxEditabilityScore >= 65 { return "Moderate editability" }
+        return "Needs review"
     }
 
     var qualityIcon: String {
@@ -2575,7 +2575,7 @@ private struct EditableVersionQualityCard: View {
                     .background(summary.qualityColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("可编辑版质量")
+                    Text("Editable Version Quality")
                         .font(.system(size: 12, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                     Text("\(summary.qualityTitle) · PPTX \(summary.pptxEditabilityScore)%")
@@ -2587,24 +2587,24 @@ private struct EditableVersionQualityCard: View {
             }
 
             HStack(spacing: 6) {
-                EditableQualityMetric(value: "\(summary.editableTextCount)", label: "文本", icon: "textformat")
-                EditableQualityMetric(value: "\(summary.replaceableImageCount)", label: "图片", icon: "photo")
-                EditableQualityMetric(value: "\(summary.adjustableShapeCount)", label: "形状", icon: "square")
+                EditableQualityMetric(value: "\(summary.editableTextCount)", label: "Text", icon: "textformat")
+                EditableQualityMetric(value: "\(summary.replaceableImageCount)", label: "Images", icon: "photo")
+                EditableQualityMetric(value: "\(summary.adjustableShapeCount)", label: "Shapes", icon: "square")
             }
 
             if isExpanded {
                 VStack(alignment: .leading, spacing: 7) {
-                    PreflightNoteRow(icon: "square.grid.2x2", title: "直接可编辑对象", detail: "\(summary.directEditableCount) / \(summary.totalObjects) 个对象可直接改字、换图或调形状")
-                    PreflightNoteRow(icon: "wand.and.rays", title: "近似还原", detail: "\(summary.approximatedCount) 个伪元素或复杂视觉已转成近似对象")
-                    PreflightNoteRow(icon: "rectangle.dashed", title: "整体保真", detail: summary.fallbackDetail)
+                    PreflightNoteRow(icon: "square.grid.2x2", title: "Directly editable objects", detail: "\(summary.directEditableCount) / \(summary.totalObjects) object(s) support direct text, image, or shape edits")
+                    PreflightNoteRow(icon: "wand.and.rays", title: "Approximated", detail: "\(summary.approximatedCount) pseudo-element(s) or complex visual(s) converted to approximated objects")
+                    PreflightNoteRow(icon: "rectangle.dashed", title: "Whole-object fidelity", detail: summary.fallbackDetail)
                 }
             } else if summary.wholeObjectCount > 0 || summary.approximatedCount > 0 {
-                Text("\(summary.approximatedCount) 个近似对象，\(summary.wholeObjectCount) 个整体保真对象")
+                Text("\(summary.approximatedCount) approximated object(s), \(summary.wholeObjectCount) whole-object fidelity object(s)")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(MaterialTheme.muted)
                     .lineLimit(2)
             } else {
-                Text("当前转换结果主要由可编辑文本、图片和形状组成。")
+                Text("This conversion is made up mostly of editable text, images, and shapes.")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(MaterialTheme.muted)
                     .lineLimit(2)
@@ -2707,15 +2707,15 @@ private extension EditorDeck {
 private extension HTMLDiagnostics {
     var preflightSummary: String {
         if blockingExportRiskCount > 0 {
-            return "\(blockingExportRiskCount) 项需先处理"
+            return "\(blockingExportRiskCount) to resolve first"
         }
         if pptxReviewRiskCount > 0 {
-            return "\(pptxReviewRiskCount) 项导出后需复核"
+            return "\(pptxReviewRiskCount) need review after export"
         }
         if (visualChangeCount ?? 0) > 0 {
-            return "\(visualChangeCount ?? 0) 处视觉变更待复核"
+            return "\(visualChangeCount ?? 0) visual change(s) awaiting review"
         }
-        return "HTML、PDF、PPTX 可进入导出复核"
+        return "HTML, PDF, and PPTX are ready for export review"
     }
 
     var preflightIcon: String {
@@ -2767,12 +2767,12 @@ private extension HTMLDiagnostics {
 
     var pptxMappingRecommendation: String {
         if (pptxFallbackObjectCount ?? 0) > 0 {
-            return "存在只能整体保留或高风险对象。若目标是可编辑 PPTX，建议先转为可编辑版；若目标是视觉完全一致，优先导出 PDF。"
+            return "Some objects can only be kept whole or carry high risk. For editable PPTX, convert to an editable version first; for exact visual fidelity, export PDF instead."
         }
         if (pptxReviewObjectCount ?? 0) > 0 {
-            return "大部分对象可编辑导出，但表格、矢量、复杂效果或层叠对象需要导出后重点复核。"
+            return "Most objects export as editable, but tables, vectors, complex effects, and layered objects need close review after export."
         }
-        return "主要由文字、图片和简单形状组成，适合导出可编辑 PPTX，仍建议抽查文本框和图片。"
+        return "Mostly text, images, and simple shapes, which suits editable PPTX export. Still spot-check text boxes and images."
     }
 
     var hasPPTXRepairActions: Bool {
@@ -2831,52 +2831,52 @@ private extension HTMLDiagnostics {
     var runtimeCompatibilityDetail: String {
         let risks = runtimeCompatibilityRiskCount
         if risks == 0 {
-            return "普通 HTML 对象，可直接精修"
+            return "Ordinary HTML objects, ready for direct refinement"
         }
 
         var parts: [String] = []
         if (scriptCount ?? 0) > 0 || (runtimeRootCount ?? 0) > 0 {
-            parts.append("脚本渲染")
+            parts.append("script-rendered content")
         }
         if (iframeCount ?? 0) > 0 {
-            parts.append("\(iframeCount ?? 0) 个嵌入页面")
+            parts.append("\(iframeCount ?? 0) embedded page(s)")
         }
         if (canvasCount ?? 0) > 0 {
-            parts.append("\(canvasCount ?? 0) 个画布")
+            parts.append("\(canvasCount ?? 0) canvas region(s)")
         }
         if (shadowRootCount ?? 0) > 0 {
-            parts.append("\(shadowRootCount ?? 0) 个封装组件")
+            parts.append("\(shadowRootCount ?? 0) encapsulated component(s)")
         }
         if (overlayBlockerCount ?? 0) > 0 {
-            parts.append("\(overlayBlockerCount ?? 0) 个遮罩")
+            parts.append("\(overlayBlockerCount ?? 0) overlay(s)")
         }
         if (externalResourceCount ?? 0) > 0 {
-            parts.append("\(externalResourceCount ?? 0) 个外部资源")
+            parts.append("\(externalResourceCount ?? 0) external resource(s)")
         }
-        return parts.isEmpty ? "\(risks) 项动态内容风险" : parts.joined(separator: "，")
+        return parts.isEmpty ? "\(risks) dynamic content risk(s)" : parts.joined(separator: ", ")
     }
 
     var responsiveReviewDetail: String {
         let responsiveRules = responsiveRuleCount ?? 0
         let responsiveRisks = responsiveLayoutRiskCount ?? 0
         let responsiveChanges = responsiveChangeCount ?? 0
-        let widthSuffix = responsiveReviewWidthText.isEmpty ? "窄屏和宽屏" : responsiveReviewWidthText
+        let widthSuffix = responsiveReviewWidthText.isEmpty ? "narrow and wide widths" : responsiveReviewWidthText
         if responsiveChanges > 0 {
-            return "\(responsiveChanges) 个已修改对象处在响应式规则、弹性/网格或粘性布局影响链里，导出前建议检查\(widthSuffix)。"
+            return "\(responsiveChanges) changed object(s) sit inside responsive rules or flex/grid/sticky layout chains. Check \(widthSuffix) before exporting."
         }
         if responsiveRisks == 0 {
-            return "未检测到明显响应式规则，常规宽度复核即可。"
+            return "No significant responsive rules detected. A normal width review is enough."
         }
         if responsiveRules > 0 {
-            return "\(responsiveRules) 条响应式规则或容器规则，修改后建议检查\(widthSuffix)。"
+            return "\(responsiveRules) responsive or container rule(s). Check \(widthSuffix) after editing."
         }
-        return "\(responsiveRisks) 个弹性/网格/粘性布局对象，修改后建议做多宽度预览。"
+        return "\(responsiveRisks) flex/grid/sticky layout object(s). Preview at multiple widths after editing."
     }
 
     var responsiveReviewWidthText: String {
         let widths = (responsiveReviewWidths ?? []).filter { $0 > 0 }.prefix(4)
         guard !widths.isEmpty else { return "" }
-        return "断点附近宽度 \(widths.map { "\($0)" }.joined(separator: " / "))px"
+        return "widths near breakpoints \(widths.map { "\($0)" }.joined(separator: " / "))px"
     }
 
     var sourcePollutionReviewCount: Int {
@@ -2894,21 +2894,21 @@ private extension HTMLDiagnostics {
         let ruleTargets = stylesheetRuleWritebackTargets.prefix(3).joined(separator: "、")
         let ruleTargetSuffix = ruleTargets.isEmpty ? "" : "（\(ruleTargets)）"
         if ruleWrites > 0 && inlineChanges == 0 {
-            return "\(ruleWrites) 次样式修改已写入本地 CSS 规则\(ruleTargetSuffix)，源码更易继续维护。"
+            return "\(ruleWrites) style change(s) written to local CSS rules\(ruleTargetSuffix), which keeps the source easier to maintain."
         }
         if ruleWrites > 0 && inlineChanges > 0 {
-            return "\(ruleWrites) 次写入 CSS 规则\(ruleTargetSuffix)，\(inlineChanges) 个对象仍写入 inline style。"
+            return "\(ruleWrites) write(s) to CSS rules\(ruleTargetSuffix); \(inlineChanges) object(s) still write to inline style."
         }
         if inlineChanges > 0 && stylesheets > 0 {
-            return "\(inlineChanges) 个变化写入 inline style；原稿含 \(stylesheets) 个样式表，保存前建议抽查源码。"
+            return "\(inlineChanges) change(s) written to inline style; the original has \(stylesheets) stylesheet(s), so spot-check the source before saving."
         }
         if externalAffectedChanges > 0 {
-            return "\(externalAffectedChanges) 个已修改对象可能受 \(externalSheets) 个外部样式表影响，建议保存前复核宽度和 class 效果。"
+            return "\(externalAffectedChanges) changed object(s) may be affected by \(externalSheets) external stylesheet(s). Review widths and class effects before saving."
         }
         if inlineChanges > 0 {
-            return "\(inlineChanges) 个对象发生 inline style 写回。"
+            return "\(inlineChanges) object(s) had inline style written back."
         }
-        return "未检测到明显源码污染风险。"
+        return "No significant source pollution risk detected."
     }
 
     var htmlReadinessScore: Int {
@@ -2956,12 +2956,12 @@ private extension HTMLDiagnostics {
 
     var pptxRiskSummary: String {
         if pptxEditabilityScore >= 85 {
-            return "PPTX 可编辑性较好，导出后抽查文本框和图片即可。"
+            return "PPTX editability is good. Spot-check text boxes and images after export."
         }
         if pptxEditabilityScore >= 65 {
-            return "PPTX 可编辑性中等，导出后重点检查表格、SVG、复杂效果、动态组件和层级。"
+            return "PPTX editability is moderate. After export, focus on tables, SVG, complex effects, dynamic components, and layering."
         }
-        return "PPTX 可编辑性风险较高，建议先处理红色问题并复核复杂效果、脚本渲染、嵌入页面和整体对象。"
+        return "PPTX editability risk is high. Resolve the red issues first, then review complex effects, script-rendered content, embedded pages, and whole objects."
     }
 
     private func boundedScore(_ value: Int) -> Int {
@@ -2996,7 +2996,7 @@ private struct HistoryBrowserPanel: View {
                     .background(MaterialTheme.primary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("版本历史")
+                    Text("Version History")
                         .font(.system(size: 22, weight: .heavy, design: .rounded))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(headerSubtitle)
@@ -3009,7 +3009,7 @@ private struct HistoryBrowserPanel: View {
                 Button {
                     model.refreshHistorySnapshots()
                 } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
                 .buttonStyle(MaterialButtonStyle())
             }
@@ -3041,13 +3041,13 @@ private struct HistoryBrowserPanel: View {
                 Button {
                     model.revealSafetyFolder()
                 } label: {
-                    Label("打开目录", systemImage: "folder")
+                    Label("Open Folder", systemImage: "folder")
                 }
                 .buttonStyle(MaterialButtonStyle())
 
                 Spacer()
 
-                Button("关闭") {
+                Button("Close") {
                     dismiss()
                 }
                 .buttonStyle(MaterialButtonStyle())
@@ -3055,7 +3055,7 @@ private struct HistoryBrowserPanel: View {
                 Button {
                     model.restoreSelectedHistorySnapshot()
                 } label: {
-                    Label("恢复所选", systemImage: "arrow.counterclockwise.circle")
+                    Label("Restore Selected", systemImage: "arrow.counterclockwise.circle")
                 }
                 .buttonStyle(MaterialButtonStyle(filled: true))
                 .disabled(model.selectedHistorySnapshotID == nil)
@@ -3071,9 +3071,9 @@ private struct HistoryBrowserPanel: View {
 
     private var headerSubtitle: String {
         if model.historySnapshots.isEmpty {
-            return "当前文件还没有可恢复的保存快照"
+            return "This file has no restorable snapshots yet"
         }
-        return "\(model.historySnapshots.count) 个可恢复版本，最新版本在最上方"
+        return "\(model.historySnapshots.count) restorable version(s), newest first"
     }
 
     private var emptyState: some View {
@@ -3081,10 +3081,10 @@ private struct HistoryBrowserPanel: View {
             Image(systemName: "clock.badge.questionmark")
                 .font(.system(size: 42, weight: .semibold))
                 .foregroundStyle(MaterialTheme.primary)
-            Text("还没有保存快照")
+            Text("No snapshots saved yet")
                 .font(.system(size: 16, weight: .heavy))
                 .foregroundStyle(MaterialTheme.ink)
-            Text("覆盖保存 HTML 或 Chiselo 项目文件后，Chiselo 会自动把旧版本放进 `.chiselo-history`，之后就能在这里复查和恢复。")
+            Text("When you overwrite an HTML or Chiselo project file, Chiselo moves the previous version into `.chiselo-history` so you can review and restore it here.")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(MaterialTheme.muted)
                 .multilineTextAlignment(.center)
@@ -3117,7 +3117,7 @@ private struct HistorySnapshotRow: View {
                             .font(.system(size: 12, weight: .heavy))
                             .foregroundStyle(isSelected ? Color.white : MaterialTheme.ink)
                         if isLatest {
-                            Text("最新")
+                            Text("Newest")
                                 .font(.system(size: 9, weight: .heavy))
                                 .foregroundStyle(isSelected ? Color.white : MaterialTheme.primary)
                                 .padding(.horizontal, 6)
@@ -3164,7 +3164,7 @@ private struct HistorySnapshotRow: View {
     }
 
     private func formatDate(_ date: Date?) -> String {
-        guard let date else { return "未知时间" }
+        guard let date else { return "Unknown time" }
         return Self.dateFormatter.string(from: date)
     }
 
@@ -3212,7 +3212,7 @@ private struct DocumentNavigator: View {
 
                         if !model.htmlTree.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("对象结构")
+                                Text("Object Structure")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 2)
@@ -3249,11 +3249,11 @@ private struct DocumentNavigator: View {
     }
 
     private var navigatorTitle: String {
-        model.documentMode == "html" ? "文档" : "页面"
+        model.documentMode == "html" ? "Document" : "Page"
     }
 
     private var navigatorSubtitle: String {
-        model.documentMode == "html" ? "页面对象" : "版面与对象"
+        model.documentMode == "html" ? "Page objects" : "Layout and objects"
     }
 
 }
@@ -3267,19 +3267,19 @@ private struct NavigatorMetricsBar: View {
     var body: some View {
         HStack(spacing: 6) {
             if let pageCount {
-                MetricPill(value: "\(pageCount)", label: "页", icon: "rectangle.on.rectangle")
+                MetricPill(value: "\(pageCount)", label: "Pages", icon: "rectangle.on.rectangle")
             }
 
             if let objectCount {
-                MetricPill(value: "\(objectCount)", label: "对象", icon: "square.3.layers.3d")
+                MetricPill(value: "\(objectCount)", label: "Objects", icon: "square.3.layers.3d")
             }
 
             if let imageCount, imageCount > 0 {
-                MetricPill(value: "\(imageCount)", label: "图", icon: "photo")
+                MetricPill(value: "\(imageCount)", label: "Images", icon: "photo")
             }
 
             if let htmlNodeCount, htmlNodeCount > 0 {
-                MetricPill(value: "\(htmlNodeCount)", label: "对象", icon: "square.3.layers.3d")
+                MetricPill(value: "\(htmlNodeCount)", label: "Objects", icon: "square.3.layers.3d")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -3349,12 +3349,12 @@ private struct HTMLDocumentCard: View {
                         .fontWeight(.bold)
                         .tracking(1.2)
                         .foregroundStyle(MaterialTheme.primary)
-                    Text("HTML 页面")
+                    Text("HTML Page")
                         .font(.caption)
                         .fontWeight(.semibold)
                         .foregroundStyle(MaterialTheme.ink)
                     Spacer()
-                    Text("点击正文或结构")
+                    Text("Click the content or the structure")
                         .font(.caption2)
                         .foregroundStyle(MaterialTheme.muted)
                 }
@@ -3384,7 +3384,7 @@ private struct HTMLDeliveryCheckCard: View {
                     .background(headerColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("交付检查")
+                    Text("Delivery Check")
                         .font(.system(size: 12, weight: .heavy))
                         .foregroundStyle(MaterialTheme.ink)
                     Text(headerSubtitle)
@@ -3398,7 +3398,7 @@ private struct HTMLDeliveryCheckCard: View {
             VStack(spacing: 7) {
                 DeliveryCheckRow(
                     icon: resourceIcon,
-                    title: "资源",
+                    title: "Resources",
                     detail: resourceDetail,
                     color: resourceColor,
                     isClickable: diagnostics.resourceElementId != nil
@@ -3410,7 +3410,7 @@ private struct HTMLDeliveryCheckCard: View {
 
                 DeliveryCheckRow(
                     icon: diagnostics.cleanExport ? "checkmark.seal" : "exclamationmark.triangle",
-                    title: "源码洁净度",
+                    title: "Source cleanliness",
                     detail: diagnostics.sourceCleanlinessDetail,
                     color: diagnostics.cleanExport ? successColor : MaterialTheme.accentDanger,
                     isClickable: false
@@ -3419,8 +3419,8 @@ private struct HTMLDeliveryCheckCard: View {
                 if (diagnostics.visualChangeCount ?? 0) > 0 {
                     DeliveryCheckRow(
                         icon: "rectangle.2.swap",
-                        title: "视觉变更",
-                        detail: "\(diagnostics.visualChangeCount ?? 0) 个对象相对打开时变化",
+                        title: "Visual Changes",
+                        detail: "\(diagnostics.visualChangeCount ?? 0) object(s) changed since open",
                         color: warningColor,
                         isClickable: !diagnostics.visualChangeTargetIds.isEmpty
                     ) {
@@ -3433,7 +3433,7 @@ private struct HTMLDeliveryCheckCard: View {
                 if diagnostics.runtimeCompatibilityRiskCount > 0 {
                     DeliveryCheckRow(
                         icon: "wand.and.rays",
-                        title: "动态内容风险",
+                        title: "Dynamic content risk",
                         detail: diagnostics.runtimeCompatibilityDetail,
                         color: warningColor,
                         isClickable: diagnostics.runtimeRiskElementId != nil
@@ -3447,7 +3447,7 @@ private struct HTMLDeliveryCheckCard: View {
                 if diagnostics.responsiveLayoutRiskCount ?? 0 > 0 {
                     DeliveryCheckRow(
                         icon: "rectangle.split.3x1",
-                        title: "多宽度复核",
+                        title: "Multi-width review",
                         detail: diagnostics.responsiveReviewDetail,
                         color: warningColor,
                         isClickable: false
@@ -3457,7 +3457,7 @@ private struct HTMLDeliveryCheckCard: View {
                 if diagnostics.sourcePollutionReviewCount > 0 {
                     DeliveryCheckRow(
                         icon: "curlybraces.square",
-                        title: "源码复核",
+                        title: "Source Review",
                         detail: diagnostics.sourcePollutionReviewDetail,
                         color: warningColor,
                         isClickable: !diagnostics.sourceWritebackTargetIds.isEmpty
@@ -3471,8 +3471,8 @@ private struct HTMLDeliveryCheckCard: View {
                 if diagnostics.tableCount > 0 {
                     DeliveryCheckRow(
                         icon: diagnostics.spanTableCount > 0 ? "tablecells.badge.ellipsis" : "tablecells",
-                        title: "表格",
-                        detail: diagnostics.spanTableCount > 0 ? "\(diagnostics.tableCount) 个表格，\(diagnostics.spanTableCount) 个含合并单元格" : "\(diagnostics.tableCount) 个表格",
+                        title: "Tables",
+                        detail: diagnostics.spanTableCount > 0 ? "\(diagnostics.tableCount) table(s), \(diagnostics.spanTableCount) with merged cells" : "\(diagnostics.tableCount) table(s)",
                         color: diagnostics.spanTableCount > 0 ? warningColor : successColor,
                         isClickable: diagnostics.tableElementId != nil
                     ) {
@@ -3486,7 +3486,7 @@ private struct HTMLDeliveryCheckCard: View {
                     DeliveryCheckRow(
                         icon: "scribble.variable",
                         title: "SVG",
-                        detail: "\(diagnostics.svgCount) 个 SVG/矢量图形",
+                        detail: "\(diagnostics.svgCount) SVG/vector graphic(s)",
                         color: warningColor,
                         isClickable: diagnostics.svgElementId != nil
                     ) {
@@ -3499,8 +3499,8 @@ private struct HTMLDeliveryCheckCard: View {
                 if (diagnostics.textOverflowCount ?? 0) > 0 {
                     DeliveryCheckRow(
                         icon: "text.badge.exclamationmark",
-                        title: "文字",
-                        detail: "\(diagnostics.textOverflowCount ?? 0) 处文字溢出",
+                        title: "Text",
+                        detail: "\(diagnostics.textOverflowCount ?? 0) text overflow(s)",
                         color: MaterialTheme.accentDanger,
                         isClickable: diagnostics.textOverflowElementId != nil
                     ) {
@@ -3513,8 +3513,8 @@ private struct HTMLDeliveryCheckCard: View {
                 if (diagnostics.outOfBoundsCount ?? 0) > 0 {
                     DeliveryCheckRow(
                         icon: "arrow.up.left.and.arrow.down.right",
-                        title: "边界",
-                        detail: "\(diagnostics.outOfBoundsCount ?? 0) 个元素超出页面",
+                        title: "Bounds",
+                        detail: "\(diagnostics.outOfBoundsCount ?? 0) element(s) outside the page",
                         color: MaterialTheme.accentDanger,
                         isClickable: diagnostics.outOfBoundsElementId != nil
                     ) {
@@ -3527,8 +3527,8 @@ private struct HTMLDeliveryCheckCard: View {
                 if (diagnostics.overlapCount ?? 0) > 0 {
                     DeliveryCheckRow(
                         icon: "square.stack.3d.up",
-                        title: "重叠",
-                        detail: "\(diagnostics.overlapCount ?? 0) 处明显重叠",
+                        title: "Overlap",
+                        detail: "\(diagnostics.overlapCount ?? 0) noticeable overlap(s)",
                         color: warningColor,
                         isClickable: diagnostics.overlapElementId != nil
                     ) {
@@ -3544,7 +3544,7 @@ private struct HTMLDeliveryCheckCard: View {
                     .overlay(MaterialTheme.hairline)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("问题定位")
+                    Text("Issue Locator")
                         .font(.system(size: 10, weight: .heavy))
                         .foregroundStyle(MaterialTheme.muted)
 
@@ -3557,7 +3557,7 @@ private struct HTMLDeliveryCheckCard: View {
                     }
 
                     if hiddenIssueCount > 0 {
-                        Text("还有 \(hiddenIssueCount) 项，处理后会继续显示")
+                        Text("\(hiddenIssueCount) more will appear as these are resolved")
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(MaterialTheme.muted)
                             .lineLimit(1)
@@ -3580,9 +3580,9 @@ private struct HTMLDeliveryCheckCard: View {
     }
 
     private var headerSubtitle: String {
-        if diagnostics.issueCount > 0 { return "\(diagnostics.issueCount) 项风险" }
-        if diagnostics.warningCount > 0 { return "\(diagnostics.warningCount) 项提示" }
-        return "可交付"
+        if diagnostics.issueCount > 0 { return "\(diagnostics.issueCount) risk(s)" }
+        if diagnostics.warningCount > 0 { return "\(diagnostics.warningCount) note(s)" }
+        return "Ready to deliver"
     }
 
     private var headerColor: Color {
@@ -3598,13 +3598,13 @@ private struct HTMLDeliveryCheckCard: View {
     private var resourceDetail: String {
         let broken = diagnostics.brokenImages + diagnostics.brokenMedia
         if broken > 0 {
-            return "\(diagnostics.brokenImages) 张断链图，\(diagnostics.brokenMedia) 个断链媒体"
+            return "\(diagnostics.brokenImages) broken image(s), \(diagnostics.brokenMedia) broken media file(s)"
         }
 
         let embedded = diagnostics.embeddedImages ?? 0
-        if diagnostics.imageCount == 0 && diagnostics.mediaCount == 0 { return "无外部图片/媒体" }
-        if embedded > 0 { return "\(diagnostics.imageCount) 张图，\(embedded) 张已嵌入" }
-        return "\(diagnostics.imageCount) 张图，\(diagnostics.mediaCount) 个媒体"
+        if diagnostics.imageCount == 0 && diagnostics.mediaCount == 0 { return "No external images or media" }
+        if embedded > 0 { return "\(diagnostics.imageCount) image(s), \(embedded) embedded" }
+        return "\(diagnostics.imageCount) image(s), \(diagnostics.mediaCount) media file(s)"
     }
 
     private var resourceColor: Color {
@@ -3884,7 +3884,7 @@ private struct SlideObjectSummary: View, Equatable {
         .labelStyle(.titleAndIcon)
         .lineLimit(1)
         .minimumScaleFactor(0.72)
-        .accessibilityLabel("\(totalCount) 个对象")
+        .accessibilityLabel("\(totalCount) object(s)")
     }
 }
 
@@ -4102,10 +4102,10 @@ private struct HTMLTreeRow: View, Equatable {
 }
 
 private enum InspectorTab: String, CaseIterable, Identifiable {
-    case layout = "几何"
-    case style = "样式"
-    case arrange = "层级"
-    case html = "精修"
+    case layout = "Geometry"
+    case style = "Style"
+    case arrange = "Arrange"
+    case html = "Refine"
 
     var id: String { rawValue }
 }
@@ -4115,7 +4115,7 @@ private struct GeometryMetrics {
     var frame: EditorElementFrame
 
     var frameLabel: String {
-        frame.label?.isEmpty == false ? frame.label! : "画布"
+        frame.label?.isEmpty == false ? frame.label! : "Canvas"
     }
 
     var left: Double { element.x - frame.x }
@@ -4127,11 +4127,11 @@ private struct GeometryMetrics {
 
     var summary: String {
         [
-            "对象: \(element.chiseloTypeLabel)",
-            "位置: X \(rounded(element.x)), Y \(rounded(element.y)), W \(rounded(element.w)), H \(rounded(element.h))",
+            "Object: \(element.chiseloTypeLabel)",
+            "Position: X \(rounded(element.x)), Y \(rounded(element.y)), W \(rounded(element.w)), H \(rounded(element.h))",
             "\(frameLabel): W \(rounded(frame.w)), H \(rounded(frame.h))",
-            "边距: 左 \(rounded(left)), 上 \(rounded(top)), 右 \(rounded(right)), 下 \(rounded(bottom))",
-            "中心偏移: X \(signed(centerXOffset)), Y \(signed(centerYOffset))"
+            "Margins: left \(rounded(left)), top \(rounded(top)), right \(rounded(right)), bottom \(rounded(bottom))",
+            "Center offset: X \(signed(centerXOffset)), Y \(signed(centerYOffset))"
         ].joined(separator: "\n")
     }
 
@@ -4156,7 +4156,7 @@ private struct InspectorPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MaterialPanelHeader(title: "属性", subtitle: "对象控制")
+            MaterialPanelHeader(title: "Inspector", subtitle: "Object controls")
                 .padding(MaterialTheme.panelPadding)
 
             if let element = model.selectedElement {
@@ -4164,7 +4164,7 @@ private struct InspectorPanel: View {
                     .padding(.horizontal, MaterialTheme.panelPadding)
                     .padding(.bottom, 10)
 
-                Picker("属性区域", selection: $selectedTab) {
+                Picker("Inspector Section", selection: $selectedTab) {
                     ForEach(availableTabs) { tab in
                         Text(tab.rawValue).tag(tab)
                     }
@@ -4269,10 +4269,10 @@ private struct InspectorPanel: View {
                     Image(systemName: "cursorarrow.rays")
                         .font(.system(size: 26))
                         .foregroundStyle(MaterialTheme.primary)
-                    Text("请选择一个对象")
+                    Text("Select an object")
                         .font(.headline)
                         .foregroundStyle(MaterialTheme.ink)
-                    Text("位置、层级、对齐等精准控制会显示在这里。")
+                    Text("Position, layering, alignment, and other precise controls appear here.")
                         .font(.callout)
                         .foregroundStyle(MaterialTheme.muted)
                 }
@@ -4290,9 +4290,9 @@ private struct InspectorPanel: View {
     }
 
     private func objectGroup(_ element: EditorElement) -> some View {
-        GroupBox("对象") {
+        GroupBox("Object") {
             VStack(alignment: .leading, spacing: 8) {
-                LabeledContent("对象", value: element.chiseloTypeLabel)
+                LabeledContent("Object", value: element.chiseloTypeLabel)
                 if let status = element.chiseloEditabilityStatus {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: status.icon)
@@ -4320,19 +4320,19 @@ private struct InspectorPanel: View {
                 if element.groupLabel != nil || element.groupId != nil {
                     GroupMembershipBadge(element: element, compact: false)
                     if element.type != "deck-group" {
-                        CommandButton(title: "选择模块", icon: "square.3.layers.3d", command: "selectModuleGroup")
-                            .help("选中所属模块，进行整组移动、对齐和吸附")
+                        CommandButton(title: "Select Module", icon: "square.3.layers.3d", command: "selectModuleGroup")
+                            .help("Select the parent module to move, align, and snap it as one group")
                     }
                 }
                 LabeledContent("ID", value: element.id)
                 if let tagName = element.tagName {
-                    LabeledContent("原始标签", value: tagName)
+                    LabeledContent("Original tag", value: tagName)
                 }
                 if let layoutMode = element.layoutMode {
-                    LabeledContent("布局", value: layoutMode)
+                    LabeledContent("Layout", value: layoutMode)
                 }
                 if let path = element.htmlPath ?? model.selectionPath {
-                    Text("原始位置")
+                    Text("Original position")
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundStyle(MaterialTheme.primary)
@@ -4347,7 +4347,7 @@ private struct InspectorPanel: View {
     }
 
     private var geometryGroup: some View {
-        GroupBox("几何") {
+        GroupBox("Geometry") {
             VStack(alignment: .leading, spacing: 12) {
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                     GridRow {
@@ -4359,7 +4359,7 @@ private struct InspectorPanel: View {
                         NumberField(label: "H", value: binding(\.h))
                     }
                     GridRow {
-                        NumberField(label: "旋转", value: binding(\.rotation))
+                        NumberField(label: "Rotation", value: binding(\.rotation))
                         NumberField(label: "Z", value: binding(\.z))
                     }
                 }
@@ -4382,11 +4382,11 @@ private struct InspectorPanel: View {
                         Button {
                             copyGeometrySummary(metrics)
                         } label: {
-                            Label("复制几何", systemImage: "doc.on.doc")
+                            Label("Copy Geometry", systemImage: "doc.on.doc")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(MaterialButtonStyle(compact: true))
-                        .help("复制位置、尺寸、边距和中心偏移，便于修改前后复查")
+                        .help("Copy position, size, margins, and center offset for before/after review")
                     }
                 }
             }
@@ -4394,40 +4394,40 @@ private struct InspectorPanel: View {
     }
 
     private var quickAdjustGroup: some View {
-        GroupBox("快速调整") {
+        GroupBox("Quick Adjust") {
             VStack(spacing: 10) {
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
-                        CommandButton(title: "上", icon: "align.vertical.top", command: "alignTop")
-                        CommandButton(title: "中", icon: "align.vertical.center", command: "alignMiddle")
-                        CommandButton(title: "下", icon: "align.vertical.bottom", command: "alignBottom")
+                        CommandButton(title: "Top", icon: "align.vertical.top", command: "alignTop")
+                        CommandButton(title: "Middle", icon: "align.vertical.center", command: "alignMiddle")
+                        CommandButton(title: "Bottom", icon: "align.vertical.bottom", command: "alignBottom")
                     }
                     GridRow {
-                        CommandButton(title: "左", icon: "align.horizontal.left", command: "alignLeft")
-                        CommandButton(title: "居中", icon: "align.horizontal.center", command: "alignCenter")
-                        CommandButton(title: "右", icon: "align.horizontal.right", command: "alignRight")
+                        CommandButton(title: "Left", icon: "align.horizontal.left", command: "alignLeft")
+                        CommandButton(title: "Center", icon: "align.horizontal.center", command: "alignCenter")
+                        CommandButton(title: "Right", icon: "align.horizontal.right", command: "alignRight")
                     }
                     GridRow {
-                        CommandButton(title: "适宽", icon: "arrow.left.and.right", command: "fitWidth")
-                        CommandButton(title: "适高", icon: "arrow.up.and.down", command: "fitHeight")
-                        CommandButton(title: "满页", icon: "rectangle.inset.filled", command: "fitPage")
+                        CommandButton(title: "Fit W", icon: "arrow.left.and.right", command: "fitWidth")
+                        CommandButton(title: "Fit H", icon: "arrow.up.and.down", command: "fitHeight")
+                        CommandButton(title: "Fill Page", icon: "rectangle.inset.filled", command: "fitPage")
                     }
                 }
 
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
                         Spacer()
-                        CommandButton(title: "上移", icon: "arrow.up", command: "nudgeUp")
+                        CommandButton(title: "Up", icon: "arrow.up", command: "nudgeUp")
                         Spacer()
                     }
                     GridRow {
-                        CommandButton(title: "左移", icon: "arrow.left", command: "nudgeLeft")
-                        CommandButton(title: "吸附", icon: "grid", command: "snapToGrid")
-                        CommandButton(title: "右移", icon: "arrow.right", command: "nudgeRight")
+                        CommandButton(title: "Left", icon: "arrow.left", command: "nudgeLeft")
+                        CommandButton(title: "Snap", icon: "grid", command: "snapToGrid")
+                        CommandButton(title: "Right", icon: "arrow.right", command: "nudgeRight")
                     }
                     GridRow {
                         Spacer()
-                        CommandButton(title: "下移", icon: "arrow.down", command: "nudgeDown")
+                        CommandButton(title: "Down", icon: "arrow.down", command: "nudgeDown")
                         Spacer()
                     }
                 }
@@ -4447,27 +4447,27 @@ private struct InspectorPanel: View {
     }
 
     private var textStyleGroup: some View {
-        GroupBox("文字") {
+        GroupBox("Text") {
             VStack(alignment: .leading, spacing: 12) {
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                     GridRow {
-                        NumberField(label: "字号", value: styleDoubleBinding(\.fontSize, defaultValue: 16))
-                        NumberField(label: "字重", value: styleDoubleBinding(\.fontWeight, defaultValue: 400))
+                        NumberField(label: "Size", value: styleDoubleBinding(\.fontSize, defaultValue: 16))
+                        NumberField(label: "Weight", value: styleDoubleBinding(\.fontWeight, defaultValue: 400))
                     }
                     GridRow {
-                        NumberField(label: "行高", value: styleDoubleBinding(\.lineHeight, defaultValue: 1.2), fractionLength: 2)
-                        StyleTextField(label: "字体名称", value: styleStringBinding(\.fontFamily, defaultValue: "-apple-system"))
+                        NumberField(label: "Line height", value: styleDoubleBinding(\.lineHeight, defaultValue: 1.2), fractionLength: 2)
+                        StyleTextField(label: "Font name", value: styleStringBinding(\.fontFamily, defaultValue: "-apple-system"))
                     }
                 }
 
                 styleColorSwatches(
-                    title: "文字颜色",
+                    title: "Text color",
                     value: styleStringBinding(\.color, defaultValue: "#111827"),
                     presets: textColorPresets
                 )
-                StyleTextField(label: "精确颜色", value: styleStringBinding(\.color, defaultValue: "#111827"))
+                StyleTextField(label: "Exact color", value: styleStringBinding(\.color, defaultValue: "#111827"))
                 styleChoiceRow(
-                    title: "文字对齐",
+                    title: "Text alignment",
                     value: styleStringBinding(\.textAlign, defaultValue: "left"),
                     options: textAlignmentPresets
                 )
@@ -4491,18 +4491,18 @@ private struct InspectorPanel: View {
     }
 
     private func styleWritebackGroup(_ status: EditorElementStyle.WritebackStatus) -> some View {
-        GroupBox("源码写回") {
+        GroupBox("Source Writeback") {
             SourceWritebackStatusBadge(status: status)
         }
     }
 
     private var imageInfoGroup: some View {
-        GroupBox("图片") {
+        GroupBox("Image") {
             VStack(spacing: 10) {
-                StyleTextField(label: "来源", value: imageSourceBinding(defaultValue: ""))
+                StyleTextField(label: "Source", value: imageSourceBinding(defaultValue: ""))
                 StyleTextField(label: "ALT", value: imageAltBinding(defaultValue: ""))
                 styleChoiceRow(
-                    title: "显示方式",
+                    title: "Display Mode",
                     value: styleStringBinding(\.objectFit, defaultValue: "cover"),
                     options: imageFitPresets
                 )
@@ -4511,7 +4511,7 @@ private struct InspectorPanel: View {
                     Button {
                         model.replaceSelectedImage()
                     } label: {
-                        Label("替换图片", systemImage: "photo.on.rectangle.angled")
+                        Label("Replace Image", systemImage: "photo.on.rectangle.angled")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(MaterialButtonStyle(filled: true))
@@ -4521,30 +4521,30 @@ private struct InspectorPanel: View {
     }
 
     private var boxStyleGroup: some View {
-        GroupBox("外观") {
+        GroupBox("Appearance") {
             VStack(alignment: .leading, spacing: 12) {
                 styleColorSwatches(
-                    title: "填充",
+                    title: "Fill",
                     value: styleStringBinding(\.fill, defaultValue: "transparent"),
                     presets: fillColorPresets
                 )
-                StyleTextField(label: "精确填充", value: styleStringBinding(\.fill, defaultValue: "transparent"))
+                StyleTextField(label: "Exact fill", value: styleStringBinding(\.fill, defaultValue: "transparent"))
                 styleColorSwatches(
-                    title: "描边",
+                    title: "Stroke",
                     value: styleStringBinding(\.stroke, defaultValue: "transparent"),
                     presets: strokeColorPresets
                 )
-                StyleTextField(label: "精确描边", value: styleStringBinding(\.stroke, defaultValue: "transparent"))
+                StyleTextField(label: "Exact stroke", value: styleStringBinding(\.stroke, defaultValue: "transparent"))
 
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                     GridRow {
-                        NumberField(label: "边框", value: styleDoubleBinding(\.strokeWidth, defaultValue: 0))
-                        NumberField(label: "圆角", value: styleDoubleBinding(\.radius, defaultValue: 0))
+                        NumberField(label: "Border", value: styleDoubleBinding(\.strokeWidth, defaultValue: 0))
+                        NumberField(label: "Radius", value: styleDoubleBinding(\.radius, defaultValue: 0))
                     }
                 }
 
                 styleChoiceRow(
-                    title: "阴影",
+                    title: "Shadow",
                     value: styleStringBinding(\.shadow, defaultValue: "none"),
                     options: shadowPresets
                 )
@@ -4566,63 +4566,63 @@ private struct InspectorPanel: View {
     }
 
     private var tableGroup: some View {
-        GroupBox("表格") {
+        GroupBox("Table") {
             Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                 GridRow {
-                    CommandButton(title: "+行", icon: "plus.square", command: "tableAddRowAfter")
-                    CommandButton(title: "-行", icon: "minus.square", command: "tableDeleteRow")
+                    CommandButton(title: "+Row", icon: "plus.square", command: "tableAddRowAfter")
+                    CommandButton(title: "-Row", icon: "minus.square", command: "tableDeleteRow")
                 }
                 GridRow {
-                    CommandButton(title: "+列", icon: "plus.rectangle.on.rectangle", command: "tableAddColumnAfter")
-                    CommandButton(title: "-列", icon: "minus.rectangle", command: "tableDeleteColumn")
+                    CommandButton(title: "+Col", icon: "plus.rectangle.on.rectangle", command: "tableAddColumnAfter")
+                    CommandButton(title: "-Col", icon: "minus.rectangle", command: "tableDeleteColumn")
                 }
             }
         }
     }
 
     private var cellStyleGroup: some View {
-        GroupBox("单元格样式") {
+        GroupBox("Cell Style") {
             VStack(spacing: 10) {
                 styleColorSwatches(
-                    title: "单元格填充",
+                    title: "Cell fill",
                     value: styleStringBinding(\.fill, defaultValue: "transparent"),
                     presets: fillColorPresets
                 )
                 styleColorSwatches(
-                    title: "单元格文字",
+                    title: "Cell text",
                     value: styleStringBinding(\.color, defaultValue: "#111827"),
                     presets: textColorPresets
                 )
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                     GridRow {
-                        StyleTextField(label: "精确填充", value: styleStringBinding(\.fill, defaultValue: "transparent"))
-                        StyleTextField(label: "精确文字", value: styleStringBinding(\.color, defaultValue: "#111827"))
+                        StyleTextField(label: "Exact fill", value: styleStringBinding(\.fill, defaultValue: "transparent"))
+                        StyleTextField(label: "Exact text color", value: styleStringBinding(\.color, defaultValue: "#111827"))
                     }
                     GridRow {
-                        StyleTextField(label: "边框", value: styleStringBinding(\.stroke, defaultValue: "transparent"))
-                        NumberField(label: "宽度", value: styleDoubleBinding(\.strokeWidth, defaultValue: 0))
+                        StyleTextField(label: "Border", value: styleStringBinding(\.stroke, defaultValue: "transparent"))
+                        NumberField(label: "Width", value: styleDoubleBinding(\.strokeWidth, defaultValue: 0))
                     }
                     GridRow {
-                        NumberField(label: "圆角", value: styleDoubleBinding(\.radius, defaultValue: 0))
-                        StyleTextField(label: "精确对齐", value: styleStringBinding(\.textAlign, defaultValue: "left"))
+                        NumberField(label: "Radius", value: styleDoubleBinding(\.radius, defaultValue: 0))
+                        StyleTextField(label: "Exact alignment", value: styleStringBinding(\.textAlign, defaultValue: "left"))
                     }
                 }
 
                 styleChoiceRow(
-                    title: "单元格对齐",
+                    title: "Cell alignment",
                     value: styleStringBinding(\.textAlign, defaultValue: "left"),
                     options: textAlignmentPresets
                 )
 
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
-                        CommandButton(title: "左", icon: "text.alignleft", command: "cellAlignLeft")
-                        CommandButton(title: "中", icon: "text.aligncenter", command: "cellAlignCenter")
-                        CommandButton(title: "右", icon: "text.alignright", command: "cellAlignRight")
+                        CommandButton(title: "Left", icon: "text.alignleft", command: "cellAlignLeft")
+                        CommandButton(title: "Center", icon: "text.aligncenter", command: "cellAlignCenter")
+                        CommandButton(title: "Right", icon: "text.alignright", command: "cellAlignRight")
                     }
                     GridRow {
-                        CommandButton(title: "表头", icon: "tablecells.badge.ellipsis", command: "cellStyleHeader")
-                        CommandButton(title: "柔和", icon: "paintbrush", command: "cellStyleSoft")
+                        CommandButton(title: "Header", icon: "tablecells.badge.ellipsis", command: "cellStyleHeader")
+                        CommandButton(title: "Soft", icon: "paintbrush", command: "cellStyleSoft")
                     }
                 }
             }
@@ -4630,29 +4630,29 @@ private struct InspectorPanel: View {
     }
 
     private var layerGroup: some View {
-        GroupBox("层级") {
+        GroupBox("Arrange") {
             Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                 GridRow {
-                    CommandButton(title: "置顶", icon: "square.3.layers.3d.top.filled", command: "bringToFront")
-                    CommandButton(title: "置底", icon: "square.3.layers.3d.down.right", command: "sendToBack")
+                    CommandButton(title: "Front", icon: "square.3.layers.3d.top.filled", command: "bringToFront")
+                    CommandButton(title: "Back", icon: "square.3.layers.3d.down.right", command: "sendToBack")
                 }
                 GridRow {
-                    CommandButton(title: "上移层", icon: "arrow.up.square", command: "bringForward")
-                    CommandButton(title: "下移层", icon: "arrow.down.square", command: "sendBackward")
+                    CommandButton(title: "Forward", icon: "arrow.up.square", command: "bringForward")
+                    CommandButton(title: "Backward", icon: "arrow.down.square", command: "sendBackward")
                 }
                 GridRow {
-                    CommandButton(title: "锁定", icon: "lock", command: "toggleLock")
-                    CommandButton(title: "删除", icon: "trash", command: "delete")
+                    CommandButton(title: "Lock", icon: "lock", command: "toggleLock")
+                    CommandButton(title: "Delete", icon: "trash", command: "delete")
                 }
                 GridRow {
-                    CommandButton(title: "复制", icon: "plus.square.on.square", command: "duplicate")
+                    CommandButton(title: "Duplicate", icon: "plus.square.on.square", command: "duplicate")
                 }
             }
         }
     }
 
     private var layerStackGroup: some View {
-        GroupBox("当前页对象") {
+        GroupBox("Objects On This Page") {
             LayerStackList(
                 elements: model.currentSlideElements.sorted { left, right in
                     if left.z == right.z { return left.id < right.id }
@@ -4664,28 +4664,28 @@ private struct InspectorPanel: View {
     }
 
     private func alignmentGroup(for element: EditorElement) -> some View {
-        GroupBox("对齐") {
+        GroupBox("Align") {
             VStack(spacing: 8) {
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
-                        CommandButton(title: "左", icon: "align.horizontal.left", command: "alignLeft")
-                        CommandButton(title: "居中", icon: "align.horizontal.center", command: "alignCenter")
+                        CommandButton(title: "Left", icon: "align.horizontal.left", command: "alignLeft")
+                        CommandButton(title: "Center", icon: "align.horizontal.center", command: "alignCenter")
                     }
                     GridRow {
-                        CommandButton(title: "右", icon: "align.horizontal.right", command: "alignRight")
-                        CommandButton(title: "垂直中", icon: "align.vertical.center", command: "alignMiddle")
+                        CommandButton(title: "Right", icon: "align.horizontal.right", command: "alignRight")
+                        CommandButton(title: "V Center", icon: "align.vertical.center", command: "alignMiddle")
                     }
                 }
 
                 if element.type == "html-group" || element.type == "deck-group" {
                     Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                         GridRow {
-                            CommandButton(title: "同宽", icon: "arrow.left.and.right.square", command: "matchWidth")
-                            CommandButton(title: "同高", icon: "arrow.up.and.down.square", command: "matchHeight")
+                            CommandButton(title: "Same Width", icon: "arrow.left.and.right.square", command: "matchWidth")
+                            CommandButton(title: "Same Height", icon: "arrow.up.and.down.square", command: "matchHeight")
                         }
                         GridRow {
-                            CommandButton(title: "横等距", icon: "arrow.left.and.right", command: "distributeHorizontal")
-                            CommandButton(title: "纵等距", icon: "arrow.up.and.down", command: "distributeVertical")
+                            CommandButton(title: "Distribute H", icon: "arrow.left.and.right", command: "distributeHorizontal")
+                            CommandButton(title: "Distribute V", icon: "arrow.up.and.down", command: "distributeVertical")
                         }
                     }
                 }
@@ -4696,7 +4696,7 @@ private struct InspectorPanel: View {
     @ViewBuilder
     private func htmlSourceSyncGroup(_ element: EditorElement) -> some View {
         if model.documentMode == "html" {
-            GroupBox("源码同步") {
+            GroupBox("Source Sync") {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "chevron.left.forwardslash.chevron.right")
@@ -4762,7 +4762,7 @@ private struct InspectorPanel: View {
                             Button {
                                 copySourceSnippet(sourceDraft)
                             } label: {
-                                Label("复制片段", systemImage: "doc.on.doc")
+                                Label("Copy Snippet", systemImage: "doc.on.doc")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(MaterialButtonStyle(compact: true))
@@ -4770,7 +4770,7 @@ private struct InspectorPanel: View {
                             Button {
                                 restoreSourceDraft(for: element)
                             } label: {
-                                Label("恢复", systemImage: "arrow.uturn.backward")
+                                Label("Restore", systemImage: "arrow.uturn.backward")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(MaterialButtonStyle(compact: true))
@@ -4788,13 +4788,13 @@ private struct InspectorPanel: View {
                             Button {
                                 model.selectHTMLNode(id: element.id)
                             } label: {
-                                Label("定位", systemImage: "scope")
+                                Label("Locate", systemImage: "scope")
                                     .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(MaterialButtonStyle(compact: true))
                         }
                     } else {
-                        Text("当前对象暂未生成可显示的源码片段。")
+                        Text("No displayable source snippet has been generated for this object yet.")
                             .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(MaterialTheme.muted)
                     }
@@ -4812,7 +4812,7 @@ private struct InspectorPanel: View {
                 .background(MaterialTheme.primary.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("先确认原始备份")
+                Text("Confirm the original backup first")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Text(text)
@@ -4832,7 +4832,7 @@ private struct InspectorPanel: View {
                 Image(systemName: "point.topleft.down.curvedto.point.bottomright.up")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.primary)
-                Text("源码路径")
+                Text("Source Path")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Spacer(minLength: 0)
@@ -4863,7 +4863,7 @@ private struct InspectorPanel: View {
 
     private func sourceAncestorNavigationButton(_ item: EditorSourceNodeItem, isSelected: Bool) -> some View {
         Button {
-            locateSourceNodeItem(item, statusPrefix: "已定位源码路径")
+            locateSourceNodeItem(item, statusPrefix: "Located source path")
         } label: {
             Text(item.label.isEmpty ? item.tagName.uppercased() : item.label)
                 .font(.system(size: 9, weight: .heavy, design: .monospaced))
@@ -4888,7 +4888,7 @@ private struct InspectorPanel: View {
                 Image(systemName: "arrow.left.and.right")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.primary)
-                Text("同级对象")
+                Text("Sibling Objects")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Text("\(items.count)")
@@ -4919,7 +4919,7 @@ private struct InspectorPanel: View {
 
     private func sourceSiblingNavigationButton(_ item: EditorSourceNodeItem, isSelected: Bool) -> some View {
         Button {
-            locateSourceNodeItem(item, statusPrefix: "已定位同级对象")
+            locateSourceNodeItem(item, statusPrefix: "Located sibling object")
         } label: {
             HStack(spacing: 5) {
                 Text(item.tagName.uppercased())
@@ -4949,7 +4949,7 @@ private struct InspectorPanel: View {
                 Image(systemName: "list.bullet.indent")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.primary)
-                Text("源码子对象")
+                Text("Child Objects")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Text("\(items.count)")
@@ -4967,7 +4967,7 @@ private struct InspectorPanel: View {
                 }
 
                 if items.count > 8 {
-                    Text("另有 \(items.count - 8) 个子对象")
+                    Text("\(items.count - 8) more child object(s)")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(MaterialTheme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -4985,7 +4985,7 @@ private struct InspectorPanel: View {
 
     private func sourceChildNavigationRow(_ item: EditorSourceNodeItem) -> some View {
         Button {
-            locateSourceNodeItem(item, statusPrefix: "已定位源码子对象")
+            locateSourceNodeItem(item, statusPrefix: "Located child object")
         } label: {
             HStack(alignment: .top, spacing: 7) {
                 Text(item.tagName.uppercased())
@@ -5002,7 +5002,7 @@ private struct InspectorPanel: View {
                             .truncationMode(.middle)
 
                         if item.canEditText == true {
-                            Text("可改字")
+                            Text("Editable")
                                 .font(.system(size: 8, weight: .heavy))
                                 .foregroundStyle(MaterialTheme.primaryDark)
                                 .padding(.horizontal, 5)
@@ -5056,36 +5056,36 @@ private struct InspectorPanel: View {
     @ViewBuilder
     private var htmlControlsGroup: some View {
         if model.documentMode == "html" {
-            GroupBox("布局模式") {
+            GroupBox("Layout Mode") {
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
-                        CommandButton(title: "自由", icon: "arrow.up.left.and.arrow.down.right", command: "setLayoutFree")
-                        CommandButton(title: "变换", icon: "move.3d", command: "setLayoutTransform")
+                        CommandButton(title: "Free", icon: "arrow.up.left.and.arrow.down.right", command: "setLayoutFree")
+                        CommandButton(title: "Transform", icon: "move.3d", command: "setLayoutTransform")
                     }
                 }
             }
 
-            GroupBox("层级导航") {
+            GroupBox("Hierarchy Navigation") {
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
-                        CommandButton(title: "上层", icon: "arrow.up.to.line", command: "selectParent")
-                        CommandButton(title: "下层", icon: "arrow.down.to.line", command: "selectFirstChild")
+                        CommandButton(title: "Parent", icon: "arrow.up.to.line", command: "selectParent")
+                        CommandButton(title: "Child", icon: "arrow.down.to.line", command: "selectFirstChild")
                     }
                     GridRow {
-                        CommandButton(title: "上一个", icon: "arrow.left.to.line", command: "selectPreviousSibling")
-                        CommandButton(title: "下一个", icon: "arrow.right.to.line", command: "selectNextSibling")
+                        CommandButton(title: "Previous", icon: "arrow.left.to.line", command: "selectPreviousSibling")
+                        CommandButton(title: "Next", icon: "arrow.right.to.line", command: "selectNextSibling")
                     }
                     GridRow {
-                        CommandButton(title: "子对象", icon: "square.grid.2x2", command: "selectVisibleChildren")
-                        CommandButton(title: "同类", icon: "rectangle.on.rectangle", command: "selectSameClass")
+                        CommandButton(title: "Children", icon: "square.grid.2x2", command: "selectVisibleChildren")
+                        CommandButton(title: "Similar", icon: "rectangle.on.rectangle", command: "selectSameClass")
                     }
                     GridRow {
-                        CommandButton(title: "清除", icon: "xmark.square", command: "clearSelection")
+                        CommandButton(title: "Clear", icon: "xmark.square", command: "clearSelection")
                     }
                 }
             }
         } else {
-            Text("HTML 工具仅在 HTML 文档模式下可用。")
+            Text("HTML tools are available only in HTML document mode.")
                 .font(.callout)
                 .foregroundStyle(MaterialTheme.muted)
                 .materialCard()
@@ -5105,11 +5105,11 @@ private struct InspectorPanel: View {
 
     private var selectedCanvasFrame: EditorElementFrame? {
         if let canvas = model.deck?.canvas {
-            return EditorElementFrame(label: "画布", x: 0, y: 0, w: canvas.width, h: canvas.height)
+            return EditorElementFrame(label: "Canvas", x: 0, y: 0, w: canvas.width, h: canvas.height)
         }
 
         if model.documentMode == "html", let element = model.selectedElement {
-            return EditorElementFrame(label: "画布", x: 0, y: 0, w: max(element.x + element.w, element.w), h: max(element.y + element.h, element.h))
+            return EditorElementFrame(label: "Canvas", x: 0, y: 0, w: max(element.x + element.w, element.w), h: max(element.y + element.h, element.h))
         }
 
         return nil
@@ -5118,13 +5118,13 @@ private struct InspectorPanel: View {
     private func copyGeometrySummary(_ metrics: GeometryMetrics) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(metrics.summary, forType: .string)
-        model.status = "已复制几何复核信息"
+        model.status = "Copied geometry review details"
     }
 
     private func copySourceSnippet(_ snippet: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(snippet, forType: .string)
-        model.status = "已复制选中对象源码片段"
+        model.status = "Copied the source snippet for the selected object"
     }
 
     private func restoreSourceDraft(for element: EditorElement) {
@@ -5133,7 +5133,7 @@ private struct InspectorPanel: View {
         sourceDraft = snippet
         sourceDraftElementID = element.id
         sourceDraftOriginalSnippet = snippet
-        model.status = "已恢复为当前选中对象的原始源码片段"
+        model.status = "Restored the original source snippet for the selected object"
     }
 
     private func canRestoreSourceDraft(for element: EditorElement) -> Bool {
@@ -5203,17 +5203,17 @@ private struct InspectorPanel: View {
 
     private func sourceSyncTitle(for element: EditorElement) -> String {
         let tag = element.tagName?.uppercased() ?? "HTML"
-        return "\(tag) 源码片段"
+        return "\(tag) source snippet"
     }
 
     private func sourceSyncDetail(for element: EditorElement) -> String {
         let lineCount = element.sourceSnippetLineCount ?? 0
-        let linePart = lineCount > 0 ? "\(lineCount) 行" : "当前对象"
+        let linePart = lineCount > 0 ? "\(lineCount) line(s)" : "current object"
         let path = element.htmlPath ?? model.selectionPath
         if let path, !path.isEmpty {
-            return "\(linePart)，与画面选中对象同步：\(path)"
+            return "\(linePart), synced with the selected object: \(path)"
         }
-        return "\(linePart)，与画面选中对象同步。"
+        return "\(linePart), synced with the selected object."
     }
 
     private func sourceDraftMappingSummaryGroup(_ summary: SourceDraftMappingSummary) -> some View {
@@ -5222,11 +5222,11 @@ private struct InspectorPanel: View {
                 Image(systemName: "point.3.connected.trianglepath.dotted")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.primary)
-                Text("对象同步预览")
+                Text("Object Mapping Preview")
                     .font(.system(size: 10, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
                 Spacer(minLength: 0)
-                Text("保留 \(summary.preservedCount) · 新增 \(summary.addedCount) · 替换 \(summary.unmatchedCount)")
+                Text("Preserved \(summary.preservedCount) · Added \(summary.addedCount) · Replaced \(summary.unmatchedCount)")
                     .font(.system(size: 8, weight: .heavy, design: .monospaced))
                     .foregroundStyle(summary.hasStructureRisk ? Color(red: 0.78, green: 0.47, blue: 0.06) : MaterialTheme.muted)
             }
@@ -5241,7 +5241,7 @@ private struct InspectorPanel: View {
             }
 
             if summary.items.count > 6 {
-                Text("其余 \(summary.items.count - 6) 项映射已折叠，应用后仍可继续逐项定位复核。")
+                Text("The remaining \(summary.items.count - 6) mapping(s) are collapsed. You can still step through them after applying.")
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(MaterialTheme.muted)
             }
@@ -5276,7 +5276,7 @@ private struct InspectorPanel: View {
             locateSourceDraftMappingItem(item)
         } label: {
             HStack(alignment: .top, spacing: 8) {
-                Text(item.kind)
+                Text(item.kindDisplay)
                     .font(.system(size: 8, weight: .heavy))
                     .foregroundStyle(sourceDraftMappingColor(for: item))
                     .padding(.horizontal, 6)
@@ -5295,7 +5295,7 @@ private struct InspectorPanel: View {
                             .font(.system(size: 9, weight: .heavy, design: .monospaced))
                             .foregroundStyle(MaterialTheme.ink)
                     } else if item.slot == "unmatched" {
-                        Text("这处原对象在新片段里没有稳定对应项。")
+                        Text("This original object has no stable counterpart in the new snippet.")
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(MaterialTheme.ink)
                     }
@@ -5317,7 +5317,7 @@ private struct InspectorPanel: View {
         }
         .buttonStyle(.plain)
         .disabled(!sourceDraftMappingCanLocate(item))
-        .help(sourceDraftMappingCanLocate(item) ? "定位当前真实对象" : "新增对象应用后才能定位")
+        .help(sourceDraftMappingCanLocate(item) ? "Locate the current live object" : "Added objects can only be located after applying")
     }
 
     private func sourceDraftMappingColor(for item: SourceDraftMappingItem) -> Color {
@@ -5337,18 +5337,18 @@ private struct InspectorPanel: View {
     }
 
     private func sourceApplyButtonTitle(_ validation: SourceDraftValidation) -> String {
-        validation.mappingSummary?.hasStructureRisk == true ? "复核并应用" : "应用源码"
+        validation.mappingSummary?.hasStructureRisk == true ? "Review and Apply" : "Apply Source"
     }
 
     private func locateSourceDraftMappingItem(_ item: SourceDraftMappingItem) {
         guard sourceDraftMappingCanLocate(item), let previousID = item.previousID else {
-            model.status = "新增对象应用源码后才能定位"
+            model.status = "Added objects can only be located after the source is applied"
             return
         }
 
         invalidateSourceDraftValidationPreview()
         model.selectHTMLNode(id: previousID)
-        model.status = item.slot == "unmatched" ? "已定位将被替换的原对象" : "已定位将保留的原对象"
+        model.status = item.slot == "unmatched" ? "Located the original object that will be replaced" : "Located the original object that will be preserved"
     }
 
     private func formatMetric(_ value: Double) -> String {
@@ -5378,56 +5378,56 @@ private struct InspectorPanel: View {
 
     private var textAlignmentPresets: [StylePresetOption] {
         [
-            StylePresetOption(title: "左", value: "left", icon: "text.alignleft"),
-            StylePresetOption(title: "中", value: "center", icon: "text.aligncenter"),
-            StylePresetOption(title: "右", value: "right", icon: "text.alignright")
+            StylePresetOption(title: "Left", value: "left", icon: "text.alignleft"),
+            StylePresetOption(title: "Center", value: "center", icon: "text.aligncenter"),
+            StylePresetOption(title: "Right", value: "right", icon: "text.alignright")
         ]
     }
 
     private var imageFitPresets: [StylePresetOption] {
         [
-            StylePresetOption(title: "裁切", value: "cover", icon: "crop"),
-            StylePresetOption(title: "完整", value: "contain", icon: "rectangle.dashed"),
-            StylePresetOption(title: "拉伸", value: "fill", icon: "arrow.left.and.right")
+            StylePresetOption(title: "Crop", value: "cover", icon: "crop"),
+            StylePresetOption(title: "Fit", value: "contain", icon: "rectangle.dashed"),
+            StylePresetOption(title: "Stretch", value: "fill", icon: "arrow.left.and.right")
         ]
     }
 
     private var shadowPresets: [StylePresetOption] {
         [
-            StylePresetOption(title: "无", value: "none", icon: "circle.slash"),
-            StylePresetOption(title: "柔和", value: "0 10px 24px rgba(15, 23, 42, 0.16)", icon: "square"),
-            StylePresetOption(title: "明显", value: "0 18px 44px rgba(15, 23, 42, 0.24)", icon: "square.fill")
+            StylePresetOption(title: "None", value: "none", icon: "circle.slash"),
+            StylePresetOption(title: "Soft", value: "0 10px 24px rgba(15, 23, 42, 0.16)", icon: "square"),
+            StylePresetOption(title: "Strong", value: "0 18px 44px rgba(15, 23, 42, 0.24)", icon: "square.fill")
         ]
     }
 
     private var textColorPresets: [StyleColorPreset] {
         [
-            StyleColorPreset(title: "深色", value: "#111827"),
-            StyleColorPreset(title: "灰色", value: "#4b5563"),
-            StyleColorPreset(title: "蓝色", value: "#0a84ff"),
-            StyleColorPreset(title: "红色", value: "#c0262d"),
-            StyleColorPreset(title: "白色", value: "#ffffff")
+            StyleColorPreset(title: "Dark", value: "#111827"),
+            StyleColorPreset(title: "Gray", value: "#4b5563"),
+            StyleColorPreset(title: "Blue", value: "#0a84ff"),
+            StyleColorPreset(title: "Red", value: "#c0262d"),
+            StyleColorPreset(title: "White", value: "#ffffff")
         ]
     }
 
     private var fillColorPresets: [StyleColorPreset] {
         [
-            StyleColorPreset(title: "透明", value: "transparent"),
-            StyleColorPreset(title: "白色", value: "#ffffff"),
-            StyleColorPreset(title: "浅灰", value: "#f3f6fb"),
-            StyleColorPreset(title: "浅蓝", value: "#e8f3ff"),
-            StyleColorPreset(title: "浅绿", value: "#eaf7ef"),
-            StyleColorPreset(title: "浅黄", value: "#fff6d8")
+            StyleColorPreset(title: "Transparent", value: "transparent"),
+            StyleColorPreset(title: "White", value: "#ffffff"),
+            StyleColorPreset(title: "Light Gray", value: "#f3f6fb"),
+            StyleColorPreset(title: "Light Blue", value: "#e8f3ff"),
+            StyleColorPreset(title: "Light Green", value: "#eaf7ef"),
+            StyleColorPreset(title: "Light Yellow", value: "#fff6d8")
         ]
     }
 
     private var strokeColorPresets: [StyleColorPreset] {
         [
-            StyleColorPreset(title: "透明", value: "transparent"),
-            StyleColorPreset(title: "浅灰", value: "#d9e1e8"),
-            StyleColorPreset(title: "深灰", value: "#6b7280"),
-            StyleColorPreset(title: "蓝色", value: "#0a84ff"),
-            StyleColorPreset(title: "红色", value: "#c0262d")
+            StyleColorPreset(title: "Transparent", value: "transparent"),
+            StyleColorPreset(title: "Light Gray", value: "#d9e1e8"),
+            StyleColorPreset(title: "Dark Gray", value: "#6b7280"),
+            StyleColorPreset(title: "Blue", value: "#0a84ff"),
+            StyleColorPreset(title: "Red", value: "#c0262d")
         ]
     }
 
@@ -5669,7 +5669,7 @@ private struct SourceDraftValidation: Equatable {
 
         if draftText.isEmpty {
             self.severity = .error
-            self.messages = ["源码片段为空。"]
+            self.messages = ["The source snippet is empty."]
             self.changeSummary = changeSummary
             return
         }
@@ -5693,27 +5693,27 @@ private struct SourceDraftValidation: Equatable {
         ]
         if blockedPatterns.contains(where: { lowercasedDraft.contains($0) }) {
             severity = .error
-            messages.append("包含脚本、样式表、嵌入对象或事件属性，不能直接应用。")
+            messages.append("Contains scripts, stylesheets, embedded objects, or event attributes and cannot be applied directly.")
         }
 
         let originalTag = Self.firstTagName(in: originalText)
         let draftTag = Self.firstTagName(in: draftText)
         if let originalTag, let draftTag, originalTag != draftTag {
             severity = severity == .error ? .error : .warning
-            messages.append("顶层标签将从 <\(originalTag)> 变为 <\(draftTag)>。")
+            messages.append("The top-level tag will change from <\(originalTag)> to <\(draftTag)>.")
         } else if let originalTagName, let draftTag, !originalTagName.isEmpty, originalTagName.lowercased() != draftTag {
             severity = severity == .error ? .error : .warning
-            messages.append("顶层标签将从 <\(originalTagName.lowercased())> 变为 <\(draftTag)>。")
+            messages.append("The top-level tag will change from <\(originalTagName.lowercased())> to <\(draftTag)>.")
         }
 
         if Self.attributeValue("id", in: originalText) != Self.attributeValue("id", in: draftText) {
             severity = severity == .error ? .error : .warning
-            messages.append("ID 将发生变化，可能影响 CSS 或脚本定位。")
+            messages.append("The ID will change, which may affect CSS or script targeting.")
         }
 
         if Self.normalizedClassValue(in: originalText) != Self.normalizedClassValue(in: draftText) {
             severity = severity == .error ? .error : .warning
-            messages.append("class 将发生变化，可能影响样式命中。")
+            messages.append("The class will change, which may affect which styles apply.")
         }
 
         if let mappingSummary {
@@ -5726,9 +5726,9 @@ private struct SourceDraftValidation: Equatable {
         }
 
         if originalText == draftText {
-            messages.append("源码片段未修改。")
+            messages.append("The source snippet is unchanged.")
         } else if messages.isEmpty {
-            messages.append("结构校验通过，将替换当前选中对象。")
+            messages.append("Structure validation passed. This will replace the selected object.")
         }
 
         self.severity = severity
@@ -5739,9 +5739,9 @@ private struct SourceDraftValidation: Equatable {
 
     var title: String {
         switch severity {
-        case .ok: return "源码校验通过"
-        case .warning: return "应用前复核"
-        case .error: return "不能应用"
+        case .ok: return "Source validation passed"
+        case .warning: return "Review before applying"
+        case .error: return "Cannot apply"
         }
     }
 
@@ -5810,18 +5810,18 @@ private struct SourceDraftValidation: Equatable {
         let draftStructure = snippetStructure(draft)
 
         var parts: [String] = []
-        if changed > 0 { parts.append("改动 \(changed) 行") }
-        if added > 0 { parts.append("新增 \(added) 行") }
-        if removed > 0 { parts.append("删除 \(removed) 行") }
+        if changed > 0 { parts.append("\(changed) line(s) changed") }
+        if added > 0 { parts.append("\(added) line(s) added") }
+        if removed > 0 { parts.append("\(removed) line(s) removed") }
         if originalStructure.tagCount != draftStructure.tagCount {
-            parts.append("标签 \(originalStructure.tagCount)->\(draftStructure.tagCount)")
+            parts.append("tags \(originalStructure.tagCount)->\(draftStructure.tagCount)")
         }
         if originalStructure.childCount != draftStructure.childCount {
-            parts.append("子对象 \(originalStructure.childCount)->\(draftStructure.childCount)")
+            parts.append("children \(originalStructure.childCount)->\(draftStructure.childCount)")
         }
 
         if parts.isEmpty {
-            parts.append("空白或缩进变化")
+            parts.append("whitespace or indentation changed")
         }
         return parts.joined(separator: "，")
     }
@@ -5883,7 +5883,7 @@ private struct LayerStackList: View {
     var body: some View {
         LazyVStack(spacing: 6) {
             if elements.isEmpty {
-                Text("当前页没有对象。")
+                Text("This page has no objects.")
                     .font(.callout)
                     .foregroundStyle(MaterialTheme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -5906,7 +5906,7 @@ private struct GroupMembershipBadge: View {
         HStack(spacing: 5) {
             Image(systemName: "square.3.layers.3d")
                 .font(.system(size: compact ? 8 : 10, weight: .heavy))
-            Text(compact ? element.chiseloGroupDisplayLabel : "所属模块：\(element.chiseloGroupDisplayLabel)")
+            Text(compact ? element.chiseloGroupDisplayLabel : "Module: \(element.chiseloGroupDisplayLabel)")
                 .font(.system(size: compact ? 9 : 10, weight: .heavy))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -5991,7 +5991,7 @@ private struct LayerStackRow: View, Equatable {
             RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
                 .stroke(isSelected ? Color.clear : MaterialTheme.hairline, lineWidth: 1)
         )
-        .help("选择 \(title)")
+        .help("Select \(title)")
     }
 
     private var title: String {
@@ -6032,18 +6032,18 @@ private extension EditorElement {
         let note = captureNote?.trimmingCharacters(in: .whitespacesAndNewlines)
         switch editability ?? "" {
         case "text-editable":
-            return ("可编辑文本", note?.isEmpty == false ? note! : "文字可直接修改，并保留当前字体、颜色和位置。", "textformat", Color(red: 0.06, green: 0.52, blue: 0.26))
+            return ("Editable text", note?.isEmpty == false ? note! : "Text can be edited directly while keeping its font, color, and position.", "textformat", Color(red: 0.06, green: 0.52, blue: 0.26))
         case "replaceable":
-            return ("可替换图片", note?.isEmpty == false ? note! : "图片保持为独立对象，可继续替换和调整。", "photo", Color(red: 0.06, green: 0.52, blue: 0.26))
+            return ("Replaceable image", note?.isEmpty == false ? note! : "The image stays a separate object you can replace and adjust.", "photo", Color(red: 0.06, green: 0.52, blue: 0.26))
         case "style-editable":
-            return ("可调样式对象", note?.isEmpty == false ? note! : "形状、背景或边框已转为可调整对象。", "square.on.square", MaterialTheme.primary)
+            return ("Adjustable style object", note?.isEmpty == false ? note! : "The shape, background, or border became an adjustable object.", "square.on.square", MaterialTheme.primary)
         case "whole-object":
-            return ("整体保真对象", note?.isEmpty == false ? note! : "该区域不能可靠拆分，已作为整体对象保留。", "rectangle.dashed", Color(red: 0.78, green: 0.47, blue: 0.06))
+            return ("Whole-object fidelity", note?.isEmpty == false ? note! : "This region cannot be split reliably, so it is kept as one whole object.", "rectangle.dashed", Color(red: 0.78, green: 0.47, blue: 0.06))
         default:
             if fidelity == "approximated" {
-                return ("近似还原", note?.isEmpty == false ? note! : "复杂视觉效果已转成可编辑近似对象。", "wand.and.rays", Color(red: 0.78, green: 0.47, blue: 0.06))
+                return ("Approximated", note?.isEmpty == false ? note! : "A complex visual effect became an editable approximated object.", "wand.and.rays", Color(red: 0.78, green: 0.47, blue: 0.06))
             }
-            return ("捕获对象", note?.isEmpty == false ? note! : "由当前渲染页面捕获。", "viewfinder", MaterialTheme.primary)
+            return ("Captured object", note?.isEmpty == false ? note! : "Captured from the current rendered page.", "viewfinder", MaterialTheme.primary)
         }
     }
 
@@ -6068,7 +6068,7 @@ private extension EditorElement {
             return groupRole
         }
 
-        return "模块"
+        return "Module"
     }
 
     var chiseloTypeLabel: String {
@@ -6076,35 +6076,35 @@ private extension EditorElement {
             return semanticLabel
         }
 
-        if type == "deck-group" { return "模块组" }
+        if type == "deck-group" { return "Module Group" }
 
         switch tagName?.lowercased() {
         case "img":
-            return "图片"
+            return "Image"
         case "table":
-            return "表格"
+            return "Table"
         case "td", "th":
-            return "单元格"
+            return "Cell"
         case "h1", "h2", "h3", "h4", "h5", "h6":
-            return "标题"
+            return "Heading"
         case "p":
-            return "段落"
+            return "Paragraph"
         case "li":
-            return "列表项"
+            return "List Item"
         case "section", "article":
-            return "模块"
+            return "Module"
         case "header":
-            return "标题区"
+            return "Header"
         case "footer":
-            return "页脚"
+            return "Footer"
         case "group":
-            return "多选对象"
+            return "Multiple Objects"
         default:
-            if type == "text" { return "文本" }
-            if type == "image" { return "图片" }
-            if type == "html-group" { return "多选对象" }
-            if type == "deck-group" { return "模块组" }
-            return "对象"
+            if type == "text" { return "Text" }
+            if type == "image" { return "Image" }
+            if type == "html-group" { return "Multiple Objects" }
+            if type == "deck-group" { return "Module Group" }
+            return "Object"
         }
     }
 
@@ -6157,23 +6157,23 @@ private extension HTMLTreeNode {
 
         switch tagName.lowercased() {
         case "img":
-            return "图片"
+            return "Image"
         case "table":
-            return "表格"
+            return "Table"
         case "td", "th":
-            return "单元格"
+            return "Cell"
         case "h1", "h2", "h3", "h4", "h5", "h6":
-            return "标题"
+            return "Heading"
         case "p":
-            return "段落"
+            return "Paragraph"
         case "li":
-            return "列表项"
+            return "List Item"
         case "section", "article":
-            return "模块"
+            return "Module"
         case "header":
-            return "标题区"
+            return "Header"
         default:
-            return "对象"
+            return "Object"
         }
     }
 
@@ -6374,16 +6374,16 @@ private struct GeometryMetricGrid: View {
     var body: some View {
         Grid(horizontalSpacing: 8, verticalSpacing: 8) {
             GridRow {
-                GeometryMetricCell(title: "左", value: metrics.left)
-                GeometryMetricCell(title: "上", value: metrics.top)
+                GeometryMetricCell(title: "Left", value: metrics.left)
+                GeometryMetricCell(title: "Top", value: metrics.top)
             }
             GridRow {
-                GeometryMetricCell(title: "右", value: metrics.right)
-                GeometryMetricCell(title: "下", value: metrics.bottom)
+                GeometryMetricCell(title: "Right", value: metrics.right)
+                GeometryMetricCell(title: "Bottom", value: metrics.bottom)
             }
             GridRow {
-                GeometryMetricCell(title: "中心 X", value: metrics.centerXOffset, signed: true)
-                GeometryMetricCell(title: "中心 Y", value: metrics.centerYOffset, signed: true)
+                GeometryMetricCell(title: "Center X", value: metrics.centerXOffset, signed: true)
+                GeometryMetricCell(title: "Center Y", value: metrics.centerYOffset, signed: true)
             }
         }
     }
@@ -6482,10 +6482,10 @@ private extension EditorElementStyle {
         let detail = writebackDetail?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if kind == "stylesheet-rule" {
-            let selector = normalizedTarget ?? "CSS 规则"
+            let selector = normalizedTarget ?? "a CSS rule"
             return (
-                "写回 CSS 规则",
-                detail?.isEmpty == false ? detail! : "安全样式修改会优先写回 \(selector)。",
+                "Writes back to CSS rule",
+                detail?.isEmpty == false ? detail! : "Safe style changes are written back to \(selector) first.",
                 selector,
                 "curlybraces",
                 Color(red: 0.06, green: 0.52, blue: 0.26)
@@ -6494,8 +6494,8 @@ private extension EditorElementStyle {
 
         if kind == "inline-style" {
             return (
-                "写入对象 style",
-                detail?.isEmpty == false ? detail! : "样式修改会写在当前对象的 inline style 上。",
+                "Writes to object style",
+                detail?.isEmpty == false ? detail! : "Style changes are written to this object's inline style.",
                 normalizedTarget,
                 "paintbrush.pointed",
                 Color(red: 0.78, green: 0.47, blue: 0.06)
@@ -6566,7 +6566,7 @@ private struct StatusBar: View {
                     .font(.caption)
                     .foregroundStyle(MaterialTheme.primary)
             } else if model.hasOpenDocument, model.documentMode == "html" {
-                Text("HTML 文档")
+                Text("HTML Document")
                     .font(.caption)
                     .foregroundStyle(MaterialTheme.primary)
             }
@@ -6596,7 +6596,7 @@ private struct StatusSelectionSummary: View {
         }
         .foregroundStyle(MaterialTheme.primaryDark)
         .padding(.leading, 6)
-        .accessibilityLabel("已选中 \(title)，尺寸 \(Int(element.w)) x \(Int(element.h))")
+        .accessibilityLabel("Selected \(title), size \(Int(element.w)) x \(Int(element.h))")
     }
 
     private var title: String {

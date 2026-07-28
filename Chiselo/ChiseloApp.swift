@@ -20,71 +20,71 @@ struct ChiseloApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("打开 HTML 或项目...") {
+                Button("Open HTML or Project...") {
                     model.openDeck()
                 }
                 .keyboardShortcut("o", modifiers: .command)
             }
 
             CommandGroup(replacing: .saveItem) {
-                Button("保存") {
+                Button("Save") {
                     model.saveDeck()
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(!model.hasOpenDocument)
 
-                Button("转为可编辑版") {
+                Button("Convert to Editable Version") {
                     model.freezeCurrentHTMLLayout()
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
                 .disabled(!model.hasOpenDocument)
 
-                Button("导出为 HTML...") {
+                Button("Export as HTML...") {
                     model.exportHTML()
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(!model.hasOpenDocument)
 
-                Button("导出为可编辑 HTML...") {
+                Button("Export as Editable HTML...") {
                     model.exportEditableHTML()
                 }
                 .disabled(!model.hasOpenDocument)
 
-                Button("导出为 PDF...") {
+                Button("Export as PDF...") {
                     model.exportPDF()
                 }
                 .disabled(!model.hasOpenDocument)
 
-                Button("导出为 PPTX...") {
+                Button("Export as PPTX...") {
                     model.exportPPTX()
                 }
                 .disabled(!model.hasOpenDocument)
             }
 
             CommandGroup(replacing: .undoRedo) {
-                Button("撤销") {
+                Button("Undo") {
                     model.editorCommand("undo")
                 }
                 .keyboardShortcut("z", modifiers: .command)
                 .disabled(!model.hasOpenDocument || !model.canUndoEdit)
-                .help(model.nextUndoLabel.map { "撤销：\($0)" } ?? "没有可撤销的编辑")
+                .help(model.nextUndoLabel.map { "Undo: \($0)" } ?? "Nothing to undo")
 
-                Button("重做") {
+                Button("Redo") {
                     model.editorCommand("redo")
                 }
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!model.hasOpenDocument || !model.canRedoEdit)
-                .help(model.nextRedoLabel.map { "重做：\($0)" } ?? "没有可重做的编辑")
+                .help(model.nextRedoLabel.map { "Redo: \($0)" } ?? "Nothing to redo")
             }
 
             CommandGroup(after: .undoRedo) {
-                Button("复制对象") {
+                Button("Duplicate Object") {
                     model.editorCommand("duplicate")
                 }
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(!model.hasOpenDocument)
 
-                Button("删除对象") {
+                Button("Delete Object") {
                     model.editorCommand("delete")
                 }
                 .disabled(!model.hasOpenDocument)

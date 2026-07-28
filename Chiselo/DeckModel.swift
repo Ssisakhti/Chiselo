@@ -92,10 +92,42 @@ struct SourceDraftMappingSummary: Codable, Equatable {
 
     var riskSummary: String {
         if hasStructureRisk {
-            return "结构会变化：保留 \(preservedCount)，新增 \(addedCount)，替换 \(unmatchedCount)"
+            return "Structure will change: \(preservedCount) preserved, \(addedCount) added, \(unmatchedCount) replaced"
         }
-        return "对象映射稳定：\(preservedCount) 个对象可保留"
+        return "Object mapping is stable: \(preservedCount) object(s) can be preserved"
     }
+}
+
+/// The Chinese `kind` values are the stable editor.js <-> Swift protocol values. This maps them
+/// to English for display only.
+///
+/// - Never compare against, filter on, serialize, or persist the returned value.
+/// - Never pass the returned value back into editor.js (revert takes `changeKey`, not `kind`).
+/// - Unknown or future kinds fall through to the raw value so a new protocol value shows up as-is
+///   rather than rendering empty.
+enum VisualKindLabel {
+    private static let table: [String: String] = [
+        "图片": "Image",
+        "文字": "Text",
+        "样式": "Style",
+        "位置/尺寸": "Position/Size",
+        "删除对象": "Deleted Object",
+        "新增对象": "Added Object",
+        "保留原对象": "Object Preserved",
+        "原对象将替换": "Object Replaced"
+    ]
+
+    static func english(_ kind: String) -> String {
+        table[kind] ?? kind
+    }
+}
+
+extension HTMLVisualChangeItem {
+    var kindDisplay: String { VisualKindLabel.english(kind) }
+}
+
+extension SourceDraftMappingItem {
+    var kindDisplay: String { VisualKindLabel.english(kind) }
 }
 
 struct EditorElementFrame: Codable, Equatable {
@@ -208,12 +240,12 @@ enum VisualChangeFilter: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .all: return "全部"
-        case .text: return "文字"
-        case .image: return "图片"
-        case .geometry: return "位置尺寸"
-        case .style: return "样式"
-        case .deleted: return "删除"
+        case .all: return "All"
+        case .text: return "Text"
+        case .image: return "Image"
+        case .geometry: return "Position & Size"
+        case .style: return "Style"
+        case .deleted: return "Deleted"
         }
     }
 
@@ -413,13 +445,13 @@ struct HTMLDiagnostics: Codable, Equatable {
 
     var sourceCleanlinessDetail: String {
         if cleanExport {
-            return "未检测到编辑器临时标记，适合交付或继续二次编辑。"
+            return "No editor-only markers detected. Ready for delivery or further editing."
         }
         let count = exportArtifactCount ?? 0
         if count > 0 {
-            return "\(count) 处编辑器临时标记仍在导出内容中，需要先处理。"
+            return "\(count) editor-only marker(s) remain in the exported content and need attention first."
         }
-        return "导出内容仍含临时标记，需要先处理。"
+        return "The exported content still contains editor-only markers that need attention first."
     }
 }
 
