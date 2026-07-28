@@ -69,7 +69,7 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key>
-  <string>zh_CN</string>
+  <string>en</string>
   <key>CFBundleExecutable</key>
   <string>$APP_NAME</string>
   <key>CFBundleIdentifier</key>
@@ -179,120 +179,141 @@ Chiselo
 
 Chisel your HTML
 
-安装方式
---------
-1. 打开这个 DMG。
-2. 把 Chiselo.app 拖到 Applications 文件夹。
-3. 从 Applications 中启动 Chiselo。
+Install
+-------
+1. Open this DMG.
+2. Drag Chiselo.app into the Applications folder.
+3. Launch Chiselo from Applications.
 
-首次打开提示
+First Launch
 ------------
-这是本地打包的未公证版本。第一次安装如果 macOS 拦住，请先看同目录里的：
+This is a locally packaged, un-notarized build. If macOS blocks the first
+launch, read this file in the same folder:
 
-- 首次打开帮助.txt
+- First Launch Help.txt
 
-最常见的解决方式：
+The most common fixes:
 
-1. 先把 Chiselo.app 拖到 Applications 再打开。
-2. 在 Finder 中右键点击 Chiselo.app，选择“打开”，再确认一次。
-3. 如果系统设置里出现“仍要打开”，点它即可。
+1. Drag Chiselo.app into Applications first, then open it.
+2. Right-click Chiselo.app in Finder, choose Open, then confirm once more.
+3. If System Settings offers "Open Anyway", click it.
 
-当前能力
---------
-- 定位：HTML 精修与交付工具。
-- 打开并精修现有或生成的 HTML 页面/文档。
-- 可把外部 HTML / HTM / XHTML 文件直接拖进窗口打开。
-- 支持在窗口、tab 条、侧栏和中间画布区域拖入文件；画布不再吞掉 HTML 文件拖拽。
-- 支持浏览器式多 tab：每个 HTML 或 Chiselo 项目独立保存当前编辑快照，可切换、关闭。
-- 支持从 Finder 把 HTML 文件拖到 Chiselo.app 图标，或用“打开方式”直接进入编辑。
-- 已内置符合 macOS 的 Chiselo 图标，Finder、Dock、安装包和应用切换器都会显示。
-- 支持页面、文档、报告、海报、dashboard 和演示式 HTML。
-- 自动修复片段式或缺少 html/head/body 包装的 HTML。
-- 采用 macOS 毛玻璃风格界面：轻量侧栏、清爽画布背景、统一设计 token。
-- 点击画布或对象结构选择内容。
-- 画布正文可直接点击选中对象；对象结构只是精细选层级的辅助。
-- 双击标题、段落、列表项、表格单元格等文字节点可直接原地编辑；选中文字节点后按 Enter 也可进入编辑。
-- 按住 Command 并滚动鼠标滚轮可直接放大/缩小画布，控制点会保持可抓取大小。
-- 画布内 hover 提示和选中快捷动作条，可直接编辑文字、替换图片、复制、删除、置顶置底。
-- Shift/Cmd 点选可多选页面对象，支持同类选择、子对象选择和组合调整。
-- 拖拽、缩放、对齐、铺满、吸附网格、微调。
-- 修改文字、替换图片、识别断链图片、增删表格行列、调整单元格样式。
-- 左侧交付检查会提示断链资源、复杂表格、SVG 和干净 HTML 状态。
-- 表格行列操作包含 rowspan / colspan 合并单元格保护。
-- 配套自动视觉 QA 脚本可逐页截图检查越界、遮挡和文本溢出。
-- 导出干净 HTML、高保真 PDF、对象级可编辑 PPTX；输出格式服务于最终交付。
-- 打开真实 HTML/Chiselo 项目文件时会保留 .chiselo-backup 原始备份；第一次修改前会提醒确认备份；保存覆盖前会写入 .chiselo-history 版本快照。
-- 工具栏可打开备份目录，也可确认后恢复最近快照。
+Current Capabilities
+--------------------
+- Positioning: an HTML refinement and delivery tool.
+- Open and refine existing or generated HTML pages and documents.
+- Drag external HTML / HTM / XHTML files straight into the window to open them.
+- Drop files onto the window, the tab bar, the sidebar, or the center canvas;
+  the canvas no longer swallows HTML file drops.
+- Browser-style tabs: each HTML file or Chiselo project keeps its own editing
+  snapshot, and tabs can be switched and closed.
+- Drag an HTML file from Finder onto the Chiselo.app icon, or use Open With to
+  go straight into editing.
+- A macOS-native Chiselo icon is built in and appears in Finder, the Dock, the
+  installer, and the app switcher.
+- Supports pages, documents, reports, posters, dashboards, and slide-style HTML.
+- Automatically repairs fragment HTML or HTML missing its html/head/body wrapper.
+- macOS frosted-glass interface: a light sidebar, a clean canvas backdrop, and
+  unified design tokens.
+- Select content by clicking the canvas or the Object Structure panel.
+- Click objects directly in the canvas body; Object Structure is a helper for
+  picking a precise level.
+- Double-click headings, paragraphs, list items, table cells, and other text
+  nodes to edit in place; pressing Enter on a selected text node also works.
+- Hold Command and scroll to zoom the canvas; handles stay large enough to grab.
+- In-canvas hover hints and a selection quick-action bar for editing text,
+  replacing images, duplicating, deleting, and moving objects front or back.
+- Shift/Cmd-click to select multiple page objects, with support for selecting
+  similar objects, child objects, and adjusting groups.
+- Drag, resize, align, fill, snap to grid, and nudge.
+- Edit text, replace images, detect broken images, add and remove table rows and
+  columns, and adjust cell styles.
+- The Delivery Check panel on the left flags broken resources, complex tables,
+  SVG, and clean-HTML status.
+- Table row and column operations protect rowspan / colspan merged cells.
+- A companion automated visual QA script screenshots each page to check for
+  out-of-bounds objects, occlusion, and text overflow.
+- Export clean HTML, high-fidelity PDF, and object-level editable PPTX; the
+  output formats serve final delivery.
+- Opening a real HTML or Chiselo project file keeps a .chiselo-backup of the
+  original, prompts you to confirm the backup before the first edit, and writes
+  a .chiselo-history version snapshot before overwriting on save.
+- The toolbar can open the backup folder and, after confirmation, restore the
+  most recent snapshot.
 
-注意事项
---------
-- 当前是开发预览版。
-- 复杂脚本页面、跨域资源、动画和伪元素的深度编辑仍在迭代。
-- 若只是试用，请先复制 HTML 文件再打开编辑。
+Notes
+-----
+- This is a development preview build.
+- Deep editing of complex script-driven pages, cross-origin resources,
+  animations, and pseudo-elements is still being iterated on.
+- If you are only trying it out, copy your HTML file before opening it to edit.
 README
 
-cat > "$DMG_STAGING/首次打开帮助.txt" <<'README'
-Chiselo 首次打开帮助
-=====================
+cat > "$DMG_STAGING/First Launch Help.txt" <<'README'
+Chiselo First Launch Help
+=========================
 
-如果你是第一次安装 Chiselo，macOS 可能会提示：
+The first time you install Chiselo, macOS may say:
 
-- “无法验证开发者”
-- “已损坏，应该移到废纸篓”
-- “无法打开，因为 Apple 无法检查其是否包含恶意软件”
+- "unidentified developer" / "cannot verify the developer"
+- "is damaged and should be moved to the Trash"
+- "cannot be opened because Apple cannot check it for malicious software"
 
-这通常不是文件坏了，而是因为当前预览版还没有做 Apple 公证。
+This usually does not mean the file is broken. It means this preview build has
+not gone through Apple notarization.
 
-推荐按下面顺序尝试：
+Try these in order:
 
-方案 1：右键打开
-----------------
-1. 先把 Chiselo.app 拖到 Applications。
-2. 打开 Finder -> Applications。
-3. 找到 Chiselo.app。
-4. 右键点击它，选择“打开”。
-5. 系统再次提示时，再点一次“打开”。
-
-这是最简单、最推荐的方式。
-
-方案 2：系统设置里点“仍要打开”
+Option 1: Right-click to open
 -----------------------------
-1. 先尝试双击一次 Chiselo.app。
-2. 出现拦截提示后，打开：
-   系统设置 -> 隐私与安全性
-3. 向下滚动到安全区域。
-4. 如果看到 Chiselo 被拦截，点击“仍要打开”。
-5. 再次确认打开。
+1. Drag Chiselo.app into Applications first.
+2. Open Finder -> Applications.
+3. Find Chiselo.app.
+4. Right-click it and choose Open.
+5. When macOS asks again, click Open once more.
 
-方案 3：如果提示“移到废纸篓”或“已损坏”
---------------------------------------
-有些 macOS 版本会把未公证应用直接说成“已损坏”。如果你确认这个 App 是从 GitHub Release 下载的，可以在终端执行：
+This is the simplest and recommended approach.
+
+Option 2: Click "Open Anyway" in System Settings
+------------------------------------------------
+1. Double-click Chiselo.app once.
+2. After the block message appears, open:
+   System Settings -> Privacy & Security
+3. Scroll down to the Security section.
+4. If you see Chiselo was blocked, click "Open Anyway".
+5. Confirm the launch once more.
+
+Option 3: If macOS says "damaged" or "move to Trash"
+----------------------------------------------------
+Some macOS versions describe an un-notarized app as damaged. If you are sure you
+downloaded this app from the GitHub Release, run this in Terminal:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Chiselo.app
 ```
 
-执行后，再回到 Applications 里双击或右键打开。
+Then go back to Applications and double-click or right-click to open it.
 
-方案 4：从源码运行
-------------------
-如果你熟悉命令行，也可以直接从源码启动：
+Option 4: Run from source
+-------------------------
+If you are comfortable with the command line, you can launch from source:
 
 ```bash
 swift run Chiselo
 ```
 
-需要：
+Requirements:
 
-- macOS 13 或更高
+- macOS 13 or later
 - Xcode Command Line Tools
-- Swift 5.9 或更高
+- Swift 5.9 or later
 
-补充提醒
---------
-- 请优先从 GitHub Release 下载官方 DMG。
-- 第一次打开时，最好先把 App 拖到 Applications，不要直接在 DMG 里运行。
-- 如果依然无法打开，重新下载 DMG 再试一次。
+Additional Notes
+----------------
+- Prefer downloading the official DMG from the GitHub Release.
+- On first launch, drag the app into Applications rather than running it from
+  inside the DMG.
+- If it still will not open, download the DMG again and retry.
 README
 
 echo "==> Creating DMG"
