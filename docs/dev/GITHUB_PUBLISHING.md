@@ -23,18 +23,21 @@ Do not commit these to the repository:
 - `.build/`;
 - `outputs/`;
 - `Chiselo.app`;
-- `Chiselo-0.1.11.dmg`;
+- `Chiselo-0.1.27.dmg`;
 - logs, temp files, local caches, and unreferenced temporary screenshots.
 
 The DMG should be uploaded later as a GitHub Release asset.
 
 ## License Position
 
-Chiselo is source-available for personal, educational, research, evaluation, and non-commercial hobby use only.
+Chiselo is publicly source-available under CC BY-NC 4.0. Non-commercial use,
+modification, and sharing require attribution; commercial use needs prior
+written permission. This is not an OSI-approved open-source license. The
+Chiselo name, icon, tagline, and Vellumloop branding are also protected; see
+`TRADEMARKS.md`.
 
-Commercial use is forbidden. Do not describe the project as "open source" in release text or marketing copy. Use "source-available non-commercial" instead.
-
-This is not legal advice. If the project later becomes commercially important, ask a lawyer to review the custom license.
+This is not legal advice. If the project becomes commercially important, ask a
+lawyer to review the trademark policy and registrations in the relevant markets.
 
 ## Recommended Repository Setup
 
@@ -71,7 +74,7 @@ Chiselo helps you refine existing HTML pages and visual documents, run delivery 
 Topics:
 
 ```text
-macos swiftui wkwebview html-editor visual-editor wysiwyg layout-editor html-layout-editor editable-html html-finishing delivery-check html-to-pdf html-to-pptx html2ppt html2pptx pdf-export pptx-export non-commercial source-available
+macos swiftui wkwebview html-editor visual-editor wysiwyg layout-editor html-layout-editor editable-html html-finishing delivery-check html-to-pdf html-to-pptx html2ppt html2pptx pdf-export pptx-export source-available noncommercial-license cc-by-nc-4-0
 ```
 
 Star reminder for README or pinned issue:
@@ -139,23 +142,36 @@ To rebuild the default package:
 
 ```bash
 scripts/release-preflight.sh
-scripts/package-dmg.sh
-hdiutil verify outputs/Chiselo-0.1.11.dmg
+CHISELO_NOTARIZE=1 scripts/package-dmg.sh
+hdiutil verify outputs/Chiselo-0.1.27.dmg
+xcrun stapler validate outputs/Chiselo-0.1.27.dmg
+spctl --assess --type open --context context:primary-signature --verbose=4 outputs/Chiselo-0.1.27.dmg
 ```
 
 Default release asset:
 
 ```text
-outputs/Chiselo-0.1.11.dmg
+outputs/Chiselo-0.1.27.dmg
+outputs/Chiselo-0.1.27-macOS-arm64-appcast.xml
+outputs/latest/appcast-arm64.xml
 ```
 
 If using a custom package output from the Codex build folder, upload:
 
 ```text
-outputs/codex-build/Chiselo-0.1.11.dmg
+outputs/codex-build/Chiselo-0.1.26.dmg
 ```
 
-Only upload one DMG to GitHub Releases unless you intentionally built multiple variants.
+Only upload one DMG to GitHub Releases unless you intentionally built multiple variants. Upload the `latest/appcast-*.xml` file to the feed path configured in `SUFeedURL` if you want in-app update checks to see this release.
+
+For the Vellumloop download bucket, publish and verify the Sparkle feed with:
+
+```bash
+scripts/publish-r2-release.sh
+scripts/verify-online-update.sh
+```
+
+Do not announce automatic updates until the online verification passes.
 
 ## Step 5: Create The GitHub Release
 
@@ -165,13 +181,13 @@ Only upload one DMG to GitHub Releases unless you intentionally built multiple v
 4. Create a new tag:
 
 ```text
-v0.1.11
+v0.1.27
 ```
 
 5. Release title:
 
 ```text
-Chiselo 0.1.11
+Chiselo 0.1.27
 ```
 
 6. Leave `Set as a pre-release` unchecked for downloadable public builds.
@@ -179,7 +195,7 @@ Chiselo 0.1.11
 8. Paste the text from:
 
 ```text
-docs/releases/RELEASE_NOTES_0.1.11_PREVIEW.md
+docs/releases/RELEASE_NOTES_0.1.27_PREVIEW.md
 ```
 
 9. Upload the DMG file.
@@ -223,7 +239,7 @@ Use GitHub Desktop or a Personal Access Token. Do not paste your GitHub password
 
 macOS says the app cannot be opened
 
-The preview build is ad-hoc signed and not notarized. Use Finder right-click -> Open for the first launch.
+Release packages should be built with `CHISELO_NOTARIZE=1 scripts/package-dmg.sh`, which signs, notarizes, staples, and then writes the Sparkle appcast. Use Finder right-click -> Open only if Gatekeeper still blocks a locally copied test build.
 
 DMG accidentally appears in `git status`
 

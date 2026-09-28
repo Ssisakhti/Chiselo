@@ -17,15 +17,15 @@ struct ContentView: View {
                 ZStack {
                     HSplitView {
                         DocumentNavigator()
-                            .frame(minWidth: 170, idealWidth: 220, maxWidth: 380)
+                            .frame(minWidth: 156, idealWidth: 190, maxWidth: 320)
                             .frame(maxHeight: .infinity)
 
                         WebEditorView()
-                            .frame(minWidth: 560)
+                            .frame(minWidth: 720)
                             .frame(maxHeight: .infinity)
 
                         InspectorPanel()
-                            .frame(minWidth: 250, idealWidth: 310, maxWidth: 480)
+                            .frame(minWidth: 238, idealWidth: 286, maxWidth: 430)
                             .frame(maxHeight: .infinity)
                     }
                     .frame(maxHeight: .infinity)
@@ -91,11 +91,13 @@ struct ContentView: View {
 private struct AppGlassBackground: View {
     var body: some View {
         ZStack {
+            MaterialTheme.background
+
             LinearGradient(
                 colors: [
-                    MaterialTheme.surfaceStrong,
-                    MaterialTheme.background,
-                    MaterialTheme.canvasChromeEnd.opacity(0.72)
+                    MaterialTheme.surfaceFloating,
+                    MaterialTheme.surfaceChrome,
+                    MaterialTheme.canvasChromeEnd.opacity(0.62)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -105,9 +107,9 @@ private struct AppGlassBackground: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.54),
-                            Color.white.opacity(0.18),
-                            MaterialTheme.glow.opacity(0.42)
+                            MaterialTheme.surfaceStrong.opacity(0.36),
+                            MaterialTheme.surfaceChrome.opacity(0.26),
+                            MaterialTheme.glow.opacity(0.24)
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -149,7 +151,12 @@ private struct BrowserTabBar: View {
                 .help("Drag the divider to resize the side panels")
         }
         .frame(height: 44)
-        .background(.ultraThinMaterial)
+        .background(
+            ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                Rectangle().fill(MaterialTheme.surfaceChrome)
+            }
+        )
         .overlay(Rectangle().fill(MaterialTheme.hairline).frame(height: 1), alignment: .top)
         .overlay(Rectangle().fill(MaterialTheme.separator).frame(height: 1), alignment: .bottom)
     }
@@ -173,12 +180,19 @@ private struct BrowserTab: View {
                         .font(.system(size: 12, weight: .semibold))
                         .lineLimit(1)
                         .truncationMode(.middle)
+                    if tab.hasUnsavedChanges {
+                        Circle()
+                            .fill(MaterialTheme.accentWarning)
+                            .frame(width: 7, height: 7)
+                            .accessibilityLabel("Has unsaved changes")
+                    }
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, minHeight: 30)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .disabled(model.isDocumentOperationInProgress)
 
             Button {
                 model.closeTab(tab.id)
@@ -188,6 +202,7 @@ private struct BrowserTab: View {
                     .frame(width: 22, height: 22)
             }
             .buttonStyle(.plain)
+            .disabled(model.isDocumentOperationInProgress)
             .help("Close tab")
         }
         .padding(.leading, 10)
@@ -196,13 +211,13 @@ private struct BrowserTab: View {
         .foregroundStyle(isActive ? MaterialTheme.ink : MaterialTheme.muted)
         .background(
             RoundedRectangle(cornerRadius: 9)
-                .fill(isActive ? MaterialTheme.surface : Color.white.opacity(0.34))
+                .fill(isActive ? MaterialTheme.surfaceFloating : MaterialTheme.surfaceChrome)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 9)
-                .stroke(isActive ? MaterialTheme.primary.opacity(0.36) : MaterialTheme.hairline, lineWidth: 1)
+                .stroke(isActive ? MaterialTheme.primary.opacity(0.30) : MaterialTheme.hairline.opacity(0.76), lineWidth: 1)
         )
-        .shadow(color: isActive ? MaterialTheme.shadow.opacity(0.20) : .clear, radius: 7, x: 0, y: 2)
+        .shadow(color: isActive ? MaterialTheme.shadow.opacity(0.12) : .clear, radius: 8, x: 0, y: 2)
     }
 }
 
@@ -280,11 +295,12 @@ private struct WelcomeStartView: View {
         .padding(34)
         .frame(maxWidth: 520)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusPanel))
+        .background(MaterialTheme.surfaceFloating, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusPanel))
         .overlay(
             RoundedRectangle(cornerRadius: MaterialTheme.radiusPanel)
-                .stroke(MaterialTheme.hairline, lineWidth: 1)
+                .stroke(MaterialTheme.hairline.opacity(0.88), lineWidth: 1)
         )
-        .shadow(color: MaterialTheme.shadow.opacity(0.18), radius: 24, x: 0, y: 10)
+        .shadow(color: MaterialTheme.shadow.opacity(0.12), radius: 24, x: 0, y: 10)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(
             Rectangle()
@@ -345,7 +361,7 @@ private struct AppToolbar: View {
                     .tracking(0.6)
                     .foregroundStyle(MaterialTheme.primary)
             }
-            .frame(width: 196, alignment: .leading)
+            .frame(width: 150, alignment: .leading)
 
             ToolbarCommandGroup {
                 ToolbarActionButton(title: "Open", icon: "folder") {
@@ -359,17 +375,6 @@ private struct AppToolbar: View {
                 .disabled(!model.hasOpenDocument)
                 .help("Save the current file, writing a version snapshot before overwriting")
 
-                ToolbarActionButton(title: "Backup", icon: "clock.arrow.circlepath") {
-                    model.revealSafetyFolder()
-                }
-                .disabled(!model.canRevealSafetyFolder)
-                .help("Open the Chiselo version snapshot folder for this file")
-
-                ToolbarActionButton(title: "Restore", icon: "arrow.counterclockwise.circle") {
-                    model.presentHistoryBrowser()
-                }
-                .disabled(!model.canRevealSafetyFolder)
-                .help("Browse Chiselo version snapshots and restore a specific version")
             }
 
             MaterialDivider()
@@ -400,34 +405,47 @@ private struct AppToolbar: View {
 
             ExportMenu()
 
-            BackdropMenu()
+            HTMLViewportPicker()
+            HTMLZoomControls()
+
+            if model.workspaceMode == .advanced {
+                AdvancedWorkspaceMenu()
+            }
+
+            WorkspaceModePicker()
 
             Spacer()
 
-            Text(modeBadgeTitle)
-                .font(.system(size: 11, weight: .heavy))
-                .foregroundStyle(MaterialTheme.primaryDark)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
-                        .fill(MaterialTheme.surfaceTint)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
-                        .stroke(MaterialTheme.separator, lineWidth: 1)
-                )
-                .help(model.documentMode == "html" ? "Refine the current HTML page or document" : "Refine the current content on a fixed canvas")
+            HStack(spacing: 6) {
+                Text(modeBadgeTitle)
+                    .foregroundStyle(MaterialTheme.primaryDark)
+                if let buildLabel {
+                    Text(buildLabel)
+                        .foregroundStyle(MaterialTheme.muted)
+                }
+            }
+            .font(.system(size: 11, weight: .heavy))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
+                    .fill(MaterialTheme.surfaceTint)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
+                    .stroke(MaterialTheme.separator, lineWidth: 1)
+            )
+            .help(buildHelp)
         }
         .buttonStyle(MaterialButtonStyle())
         .padding(.horizontal, MaterialTheme.panelPadding)
         .padding(.vertical, 12)
         .background(
             ZStack {
-                Rectangle().fill(.regularMaterial)
-                Rectangle().fill(Color.white.opacity(0.22))
+                Rectangle().fill(.ultraThinMaterial)
+                Rectangle().fill(MaterialTheme.surfaceChrome)
             }
-            .shadow(color: MaterialTheme.shadow.opacity(0.20), radius: 10, x: 0, y: 2)
+            .shadow(color: MaterialTheme.shadow.opacity(0.10), radius: 12, x: 0, y: 2)
         )
         .overlay(Rectangle().fill(MaterialTheme.hairline).frame(height: 1), alignment: .top)
         .overlay(Rectangle().fill(MaterialTheme.separator).frame(height: 1), alignment: .bottom)
@@ -437,26 +455,23 @@ private struct AppToolbar: View {
         guard model.hasOpenDocument else { return "Ready to start" }
         return model.documentMode == "html" ? "Page Refine" : "Canvas Refine"
     }
-}
 
-private struct BackdropMenu: View {
-    @EnvironmentObject private var model: EditorModel
-
-    var body: some View {
-        Menu {
-            ForEach(EditorModel.EditorBackdrop.allCases) { backdrop in
-                Button {
-                    model.setEditorBackdrop(backdrop)
-                } label: {
-                    Label(backdrop.title, systemImage: model.editorBackdrop == backdrop ? "checkmark.circle.fill" : backdrop.iconName)
-                }
-            }
-        } label: {
-            Label("Backdrop", systemImage: "square.grid.3x3")
+    private var buildLabel: String? {
+        guard let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else { return nil }
+        let fingerprint = (Bundle.main.infoDictionary?["ChiseloBuildFingerprint"] as? String)?.prefix(7)
+        if let fingerprint, !fingerprint.isEmpty {
+            return "v\(version) · \(fingerprint)"
         }
-        .menuStyle(.button)
-        .buttonStyle(MaterialButtonStyle())
-        .help("Switch the editor backdrop")
+        return "v\(version)"
+    }
+
+    private var buildHelp: String {
+        let mode = model.documentMode == "html" ? "Edit the current HTML page or document" : "Edit the current content on a fixed canvas"
+        let timestamp = Bundle.main.infoDictionary?["ChiseloBuildTimestamp"] as? String
+        if let buildLabel, let timestamp {
+            return "\(mode). Current build: \(buildLabel), \(timestamp)"
+        }
+        return mode
     }
 }
 
@@ -524,14 +539,16 @@ private struct ExportMenu: View {
                 )
             }
 
-            Button {
-                model.exportEditableHTML()
-            } label: {
-                ExportMenuItemLabel(
-                    title: "Editable HTML",
-                    subtitle: "Text can be edited directly in the browser",
-                    icon: "pencil.and.outline"
-                )
+            if model.workspaceMode == .advanced {
+                Button {
+                    model.exportEditableHTML()
+                } label: {
+                    ExportMenuItemLabel(
+                        title: "Editable HTML",
+                        subtitle: "Edit text directly in the browser",
+                        icon: "pencil.and.outline"
+                    )
+                }
             }
 
             Divider()
@@ -546,14 +563,16 @@ private struct ExportMenu: View {
                 )
             }
 
-            Button {
-                model.exportPPTX()
-            } label: {
-                ExportMenuItemLabel(
-                    title: "Editable PPTX",
-                    subtitle: "An editable Office delivery format",
-                    icon: "rectangle.on.rectangle.angled"
-                )
+            if model.workspaceMode == .advanced {
+                Button {
+                    model.exportPPTX()
+                } label: {
+                    ExportMenuItemLabel(
+                        title: "Editable PPTX",
+                        subtitle: "Deliver as an editable Office format",
+                        icon: "rectangle.on.rectangle.angled"
+                    )
+                }
             }
         } label: {
             Label("Export", systemImage: "square.and.arrow.up")
@@ -561,17 +580,21 @@ private struct ExportMenu: View {
         .menuStyle(.button)
         .buttonStyle(MaterialButtonStyle(filled: true))
         .disabled(!model.hasOpenDocument)
-        .help("Export HTML, PDF, or editable PPTX from the HTML master asset")
+        .help(model.workspaceMode == .advanced ? "Export HTML, PDF, or editable PPTX" : "Export HTML or a high-fidelity PDF")
     }
 
     private var preflightSubtitle: String {
-        guard model.documentMode == "html" else { return "Check pages, objects, and export formats" }
-        return model.htmlDiagnostics.preflightSummary
+        guard model.documentMode == "html" else { return "Check the page, objects, and export format" }
+        return model.workspaceMode == .advanced
+            ? model.htmlDiagnostics.preflightSummary
+            : model.htmlDiagnostics.ordinaryPreflightSummary
     }
 
     private var preflightIcon: String {
         guard model.documentMode == "html" else { return "checklist" }
-        return model.htmlDiagnostics.preflightIcon
+        return model.workspaceMode == .advanced
+            ? model.htmlDiagnostics.preflightIcon
+            : model.htmlDiagnostics.ordinaryPreflightIcon
     }
 }
 
@@ -601,7 +624,7 @@ private struct ExportPreflightPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: model.documentMode == "html" ? model.htmlDiagnostics.preflightIcon : "checklist")
+                Image(systemName: preflightHeaderIcon)
                     .font(.system(size: 22, weight: .heavy))
                     .foregroundStyle(headerColor)
                     .frame(width: 42, height: 42)
@@ -662,14 +685,16 @@ private struct ExportPreflightPanel: View {
                 } label: {
                     Label("Export PDF", systemImage: "doc.richtext")
                 }
-                .buttonStyle(MaterialButtonStyle())
+                .buttonStyle(MaterialButtonStyle(filled: model.workspaceMode == .ordinary))
 
-                Button {
-                    closeThen { model.exportPPTX() }
-                } label: {
-                    Label("Export PPTX", systemImage: "rectangle.on.rectangle.angled")
+                if model.workspaceMode == .advanced {
+                    Button {
+                        closeThen { model.exportPPTX() }
+                    } label: {
+                        Label("Export PPTX", systemImage: "rectangle.on.rectangle.angled")
+                    }
+                    .buttonStyle(MaterialButtonStyle(filled: true))
                 }
-                .buttonStyle(MaterialButtonStyle(filled: true))
             }
             .padding(16)
             .background(MaterialTheme.surfaceStrong)
@@ -681,7 +706,7 @@ private struct ExportPreflightPanel: View {
         let diagnostics = model.htmlDiagnostics
 
         return VStack(alignment: .leading, spacing: 16) {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: preflightScoreColumns, spacing: 12) {
                 ExportTargetScoreCard(
                     title: "HTML",
                     subtitle: "Source cleanliness \(diagnostics.sourceCleanlinessPercent)%",
@@ -700,17 +725,22 @@ private struct ExportPreflightPanel: View {
                     color: scoreColor(diagnostics.pdfFidelityScore)
                 )
 
-                ExportTargetScoreCard(
-                    title: "PPTX",
-                    subtitle: "Editability \(diagnostics.pptxEditabilityScore)%",
-                    score: diagnostics.pptxEditabilityScore,
-                    icon: "rectangle.on.rectangle.angled",
-                    detail: diagnostics.pptxRiskSummary,
-                    color: scoreColor(diagnostics.pptxEditabilityScore)
-                )
+                if model.workspaceMode == .advanced {
+                    ExportTargetScoreCard(
+                        title: "PPTX",
+                        subtitle: "Editability \(diagnostics.pptxEditabilityScore)%",
+                        score: diagnostics.pptxEditabilityScore,
+                        icon: "rectangle.on.rectangle.angled",
+                        detail: diagnostics.pptxRiskSummary,
+                        color: scoreColor(diagnostics.pptxEditabilityScore)
+                    )
+                }
             }
 
-            PreflightRecommendationCard(diagnostics: diagnostics)
+            PreflightRecommendationCard(
+                diagnostics: diagnostics,
+                includesPPTX: model.workspaceMode == .advanced
+            )
             if (diagnostics.visualChangeCount ?? 0) > 0 {
                 VisualChangeReviewCard(
                     diagnostics: diagnostics,
@@ -734,7 +764,7 @@ private struct ExportPreflightPanel: View {
                     model.selectHTMLNode(id: elementId)
                 }
             }
-            if diagnostics.sourcePollutionReviewCount > 0 {
+            if model.workspaceMode == .advanced, diagnostics.sourcePollutionReviewCount > 0 {
                 SourceWritebackReviewCard(
                     diagnostics: diagnostics,
                     onSelectTarget: { elementId in
@@ -746,24 +776,26 @@ private struct ExportPreflightPanel: View {
                     }
                 )
             }
-            PPTXMappingReportCard(diagnostics: diagnostics) { elementId in
-                dismiss()
-                model.selectHTMLNode(id: elementId)
-            }
-            if diagnostics.hasPPTXRepairActions {
-                PPTXRepairActionCard(
-                    diagnostics: diagnostics,
-                    onSelectTarget: { elementId in
-                        dismiss()
-                        model.selectHTMLNode(id: elementId)
-                    },
-                    onConvertEditable: {
-                        closeThen { model.freezeCurrentHTMLLayout() }
-                    },
-                    onExportPDF: {
-                        closeThen { model.exportPDF() }
-                    }
-                )
+            if model.workspaceMode == .advanced {
+                PPTXMappingReportCard(diagnostics: diagnostics) { elementId in
+                    dismiss()
+                    model.selectHTMLNode(id: elementId)
+                }
+                if diagnostics.hasPPTXRepairActions {
+                    PPTXRepairActionCard(
+                        diagnostics: diagnostics,
+                        onSelectTarget: { elementId in
+                            dismiss()
+                            model.selectHTMLNode(id: elementId)
+                        },
+                        onConvertEditable: {
+                            closeThen { model.freezeCurrentHTMLLayout() }
+                        },
+                        onExportPDF: {
+                            closeThen { model.exportPDF() }
+                        }
+                    )
+                }
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -771,10 +803,15 @@ private struct ExportPreflightPanel: View {
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(MaterialTheme.ink)
 
-                if let issues = diagnostics.issues, !issues.isEmpty {
-                    ForEach(issues.prefix(10)) { issue in
+                if !visiblePreflightIssues.isEmpty {
+                    ForEach(visiblePreflightIssues.prefix(10)) { issue in
                         DeliveryIssueRow(issue: issue) {
                             if let elementId = issue.elementId {
+                                dismiss()
+                                model.selectHTMLNode(id: elementId)
+                            }
+                        } relatedAction: {
+                            if let elementId = issue.relatedElementId {
                                 dismiss()
                                 model.selectHTMLNode(id: elementId)
                             }
@@ -793,17 +830,19 @@ private struct ExportPreflightPanel: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("PPTX Review Notes")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(MaterialTheme.ink)
+            if model.workspaceMode == .advanced {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("PPTX Review Notes")
+                        .font(.system(size: 13, weight: .heavy))
+                        .foregroundStyle(MaterialTheme.ink)
 
-                PreflightNoteRow(icon: "rectangle.2.swap", title: "Visual Changes", detail: (diagnostics.visualChangeCount ?? 0) > 0 ? "\(diagnostics.visualChangeCount ?? 0) object(s) changed since the file was opened. Review them one by one before exporting." : "No significant object-level changes detected since the file was opened.")
-                PreflightNoteRow(icon: "rectangle.split.3x1", title: "Responsive", detail: diagnostics.responsiveReviewDetail)
-                PreflightNoteRow(icon: "tablecells", title: "Tables", detail: diagnostics.spanTableCount > 0 ? "Merged cells reduce PPTX object mapping stability." : "Even simple tables are worth spot-checking rows, columns, and text boxes after export.")
-                PreflightNoteRow(icon: "scribble.variable", title: "Vector/SVG", detail: diagnostics.svgCount > 0 ? "SVG or complex vector art may convert to shapes or images. Review how editable it stays." : "No significant SVG risk detected.")
-                PreflightNoteRow(icon: "camera.filters", title: "Visual Effects", detail: (diagnostics.pptxEffectRiskCount ?? 0) > 0 ? "\(diagnostics.pptxEffectRiskCount ?? 0) complex CSS effect(s) need review after PPTX export." : "No significant complex CSS effect risk detected.")
-                PreflightNoteRow(icon: "square.stack.3d.up", title: "Layering", detail: (diagnostics.overlapCount ?? 0) > 0 ? "Check the stacking order of overlapping objects after PPTX export." : "No significant overlap risk detected.")
+                    PreflightNoteRow(icon: "rectangle.2.swap", title: "Visual Changes", detail: (diagnostics.visualChangeCount ?? 0) > 0 ? "\(diagnostics.visualChangeCount ?? 0) objects changed since opening. Review each item before export." : "No clear object-level changes were detected since opening.")
+                    PreflightNoteRow(icon: "rectangle.split.3x1", title: "Responsive Layout", detail: diagnostics.responsiveReviewDetail)
+                    PreflightNoteRow(icon: "tablecells", title: "Tables", detail: diagnostics.spanTableCount > 0 ? "Merged cells reduce the stability of PPTX object mapping." : "Review rows, columns, and text boxes in standard tables after export.")
+                    PreflightNoteRow(icon: "scribble.variable", title: "Vector/SVG", detail: diagnostics.svgCount > 0 ? "SVG or complex vectors can become shapes or images. Review their editability." : "No clear SVG risk was detected.")
+                    PreflightNoteRow(icon: "camera.filters", title: "Visual Effects", detail: (diagnostics.pptxEffectRiskCount ?? 0) > 0 ? "\(diagnostics.pptxEffectRiskCount ?? 0) complex CSS effects require review after PPTX export." : "No clear complex CSS effect risk was detected.")
+                    PreflightNoteRow(icon: "square.stack.3d.up", title: "Layers", detail: (diagnostics.overlapCount ?? 0) > 0 ? "Review the layer order of overlapping objects after PPTX export." : "No clear overlap risk was detected.")
+                }
             }
         }
     }
@@ -812,7 +851,7 @@ private struct ExportPreflightPanel: View {
         let editableSummary = model.deck?.editableVersionSummary
 
         return VStack(alignment: .leading, spacing: 16) {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            LazyVGrid(columns: preflightScoreColumns, spacing: 12) {
                 ExportTargetScoreCard(
                     title: "HTML",
                     subtitle: "Canvas export",
@@ -829,14 +868,16 @@ private struct ExportPreflightPanel: View {
                     detail: "PDF renders at page size, which suits high-fidelity delivery.",
                     color: scoreColor(96)
                 )
-                ExportTargetScoreCard(
-                    title: "PPTX",
-                    subtitle: editableSummary.map { "Editability \($0.pptxEditabilityScore)%" } ?? "Objects editable",
-                    score: editableSummary?.pptxEditabilityScore ?? 90,
-                    icon: "rectangle.on.rectangle.angled",
-                    detail: editableSummary?.pptxDetail ?? "Text, images, and shapes are kept as editable objects wherever possible.",
-                    color: scoreColor(editableSummary?.pptxEditabilityScore ?? 90)
-                )
+                if model.workspaceMode == .advanced {
+                    ExportTargetScoreCard(
+                        title: "PPTX",
+                        subtitle: editableSummary.map { "Editability \($0.pptxEditabilityScore)%" } ?? "Editable objects",
+                        score: editableSummary?.pptxEditabilityScore ?? 90,
+                        icon: "rectangle.on.rectangle.angled",
+                        detail: editableSummary?.pptxDetail ?? "Text, images, and shapes are kept editable when possible.",
+                        color: scoreColor(editableSummary?.pptxEditabilityScore ?? 90)
+                    )
+                }
             }
 
             if let editableSummary {
@@ -856,25 +897,56 @@ private struct ExportPreflightPanel: View {
 
     private var headerSubtitle: String {
         if model.documentMode == "html" {
-            return model.htmlDiagnostics.preflightSummary
+            return model.workspaceMode == .advanced
+                ? model.htmlDiagnostics.preflightSummary
+                : model.htmlDiagnostics.ordinaryPreflightSummary
         }
-        return "A fixed canvas can export HTML, PDF, and PPTX"
+        return model.workspaceMode == .advanced ? "The fixed canvas can export HTML, PDF, and PPTX" : "The fixed canvas can export HTML and PDF"
+    }
+
+    private var preflightHeaderIcon: String {
+        guard model.documentMode == "html" else { return "checklist" }
+        return model.workspaceMode == .advanced
+            ? model.htmlDiagnostics.preflightIcon
+            : model.htmlDiagnostics.ordinaryPreflightIcon
     }
 
     private var headerColor: Color {
         if model.documentMode == "html" {
-            return scoreColor(model.htmlDiagnostics.overallExportScore)
+            let diagnostics = model.htmlDiagnostics
+            let score = model.workspaceMode == .advanced
+                ? diagnostics.overallExportScore
+                : min(diagnostics.htmlReadinessScore, diagnostics.pdfFidelityScore)
+            return scoreColor(score)
         }
         return successColor
     }
 
+    private var preflightScoreColumns: [GridItem] {
+        let count = model.workspaceMode == .advanced ? 3 : 2
+        return Array(repeating: GridItem(.flexible()), count: count)
+    }
+
+    private var visiblePreflightIssues: [HTMLDiagnosticIssue] {
+        let issues = model.htmlDiagnostics.issues ?? []
+        guard model.workspaceMode == .ordinary else { return issues }
+        let advancedOnlyKinds: Set<String> = [
+            "span-table",
+            "pptx-effect-risk",
+            "source-pollution-review",
+            "stylesheet-rule-writeback",
+            "stylesheet-edit-review"
+        ]
+        return issues.filter { !advancedOnlyKinds.contains($0.kind) }
+    }
+
     private var successColor: Color {
-        Color(red: 0.06, green: 0.52, blue: 0.26)
+        MaterialTheme.accentSuccess
     }
 
     private func scoreColor(_ score: Int) -> Color {
         if score >= 85 { return successColor }
-        if score >= 65 { return Color(red: 0.78, green: 0.47, blue: 0.06) }
+        if score >= 65 { return MaterialTheme.accentWarning }
         return MaterialTheme.accentDanger
     }
 
@@ -935,6 +1007,7 @@ private struct ExportTargetScoreCard: View {
 
 private struct PreflightRecommendationCard: View {
     var diagnostics: HTMLDiagnostics
+    var includesPPTX: Bool = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -964,21 +1037,23 @@ private struct PreflightRecommendationCard: View {
         if diagnostics.blockingExportRiskCount > 0 {
             items.append(("exclamationmark.triangle.fill", "Resolve the red issues before exporting a final version. Broken links, text overflow, and out-of-bounds objects directly affect delivery quality.", MaterialTheme.accentDanger))
         } else {
-            items.append(("checkmark.seal.fill", "HTML and PDF are ready for export review. For important files, still open the export and spot-check it.", Color(red: 0.06, green: 0.52, blue: 0.26)))
+            items.append(("checkmark.seal.fill", "HTML and PDF are ready for export review. Open and review important exported files.", MaterialTheme.accentSuccess))
         }
 
-        if diagnostics.pptxReviewRiskCount > 0 {
-            items.append(("rectangle.on.rectangle.angled", "When exporting editable PPTX, pay close attention to tables, SVG, complex visual effects, overlapping objects, and merged cells.", Color(red: 0.78, green: 0.47, blue: 0.06)))
-        } else {
-            items.append(("rectangle.on.rectangle.angled", "PPTX editability risk is low. After exporting, check text boxes, images, and object layering.", Color(red: 0.06, green: 0.52, blue: 0.26)))
+        if includesPPTX {
+            if diagnostics.pptxReviewRiskCount > 0 {
+                items.append(("rectangle.on.rectangle.angled", "For editable PPTX export, review tables, SVG content, complex visual effects, overlapping objects, and merged cells.", MaterialTheme.accentWarning))
+            } else {
+                items.append(("rectangle.on.rectangle.angled", "PPTX editability risk is low. Review text boxes, images, and object layers after export.", MaterialTheme.accentSuccess))
+            }
         }
 
         if (diagnostics.visualChangeCount ?? 0) > 0 {
-            items.append(("rectangle.2.swap", "Object-level visual changes since opening were detected. Confirm the scope of each change before exporting.", Color(red: 0.78, green: 0.47, blue: 0.06)))
+            items.append(("rectangle.2.swap", "Object-level visual changes were detected. Confirm each change before export.", MaterialTheme.accentWarning))
         }
 
         if diagnostics.runtimeCompatibilityRiskCount > 0 {
-            items.append(("viewfinder", "Script-rendered content, embedded pages, and canvas regions cannot always be split into ordinary objects. For stable delivery-grade adjustment, convert to an editable version first.", Color(red: 0.78, green: 0.47, blue: 0.06)))
+            items.append(("viewfinder", "Script-rendered content, embedded pages, and canvas content cannot always become standard objects. Convert to an editable version before precise editing when you need a stable deliverable.", MaterialTheme.accentWarning))
         }
         return items
     }
@@ -1098,7 +1173,7 @@ private struct VisualChangeReviewCard: View {
     }
 
     private var warningColor: Color {
-        Color(red: 0.78, green: 0.47, blue: 0.06)
+        MaterialTheme.accentWarning
     }
 
     private func visualChangeSubtitle(changeCount: Int, targetCount: Int) -> String {
@@ -1117,7 +1192,7 @@ private struct ResponsiveChangeReviewCard: View {
 
     @State private var targetIndex = 0
 
-    private let color = Color(red: 0.78, green: 0.47, blue: 0.06)
+    private let color = MaterialTheme.accentWarning
 
     var body: some View {
         let items = diagnostics.responsiveChangePreviewItems
@@ -1270,7 +1345,7 @@ private struct SourceWritebackReviewCard: View {
 
     @State private var targetIndex = 0
 
-    private let color = Color(red: 0.78, green: 0.47, blue: 0.06)
+    private let color = MaterialTheme.accentWarning
 
     var body: some View {
         let inlineItems = diagnostics.inlineStyleChangeItems
@@ -1363,9 +1438,9 @@ private struct SourceWritebackSelectorList: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "curlybraces")
                 .font(.system(size: 10, weight: .heavy))
-                .foregroundStyle(Color(red: 0.06, green: 0.52, blue: 0.26))
+                .foregroundStyle(MaterialTheme.accentSuccess)
                 .frame(width: 18, height: 18)
-                .background(Color(red: 0.06, green: 0.52, blue: 0.26).opacity(0.10), in: RoundedRectangle(cornerRadius: 5))
+                .background(MaterialTheme.accentSuccess.opacity(0.10), in: RoundedRectangle(cornerRadius: 5))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("CSS Rules")
@@ -1472,7 +1547,7 @@ private struct SourceWritebackRow: View {
     }
 
     private var iconColor: Color {
-        item.writebackKind == "stylesheet-rule" ? Color(red: 0.06, green: 0.52, blue: 0.26) : color
+        item.writebackKind == "stylesheet-rule" ? MaterialTheme.accentSuccess : color
     }
 }
 
@@ -1632,7 +1707,7 @@ private struct VisualSnapshotComparison: View {
         if diff.hasMeaningfulChange {
             return color
         }
-        return Color(red: 0.06, green: 0.52, blue: 0.26)
+        return MaterialTheme.accentSuccess
     }
 
     private func percentText(_ value: Double) -> String {
@@ -1844,7 +1919,7 @@ private struct VisualChangeMap: View {
 
     private func fillColor(for item: HTMLVisualChangeItem) -> Color {
         if item.kind.contains("删除") { return MaterialTheme.accentDanger }
-        if item.kind.contains("新增") { return Color(red: 0.06, green: 0.52, blue: 0.26) }
+        if item.kind.contains("新增") { return MaterialTheme.accentSuccess }
         return color
     }
 }
@@ -2007,7 +2082,7 @@ private struct VisualChangePreviewRow: View {
 
     private var rowColor: Color {
         if item.kind.contains("删除") { return MaterialTheme.accentDanger }
-        if item.kind.contains("新增") { return Color(red: 0.06, green: 0.52, blue: 0.26) }
+        if item.kind.contains("新增") { return MaterialTheme.accentSuccess }
         return color
     }
 }
@@ -2125,7 +2200,7 @@ private struct PPTXMappingReportCard: View {
                             icon: "checklist",
                             count: diagnostics.pptxReviewObjectCount ?? 0,
                             targetIds: diagnostics.pptxReviewTargetIds,
-                            color: Color(red: 0.78, green: 0.47, blue: 0.06),
+                            color: MaterialTheme.accentWarning,
                             index: $reviewTargetIndex,
                             onSelectTarget: onSelectTarget
                         )
@@ -2162,8 +2237,8 @@ private struct PPTXMappingReportCard: View {
 
     private var reportColor: Color {
         if diagnostics.pptxFallbackObjectCount ?? 0 > 0 { return MaterialTheme.accentDanger }
-        if diagnostics.pptxReviewObjectCount ?? 0 > 0 { return Color(red: 0.78, green: 0.47, blue: 0.06) }
-        return Color(red: 0.06, green: 0.52, blue: 0.26)
+        if diagnostics.pptxReviewObjectCount ?? 0 > 0 { return MaterialTheme.accentWarning }
+        return MaterialTheme.accentSuccess
     }
 
     private var hasTargetNavigation: Bool {
@@ -2406,9 +2481,9 @@ private struct PPTXRepairActionCard: View {
                 if diagnostics.shouldOfferPDFFallback {
                     PPTXRepairActionRow(
                         icon: "doc.richtext",
-                        title: "Fidelity Delivery",
-                        detail: "Use PDF when visual consistency matters most",
-                        color: Color(red: 0.06, green: 0.52, blue: 0.26),
+                        title: "High-Fidelity Delivery",
+                        detail: "Use PDF when visual consistency has priority",
+                        color: MaterialTheme.accentSuccess,
                         buttonTitle: "Export PDF"
                     ) {
                         onExportPDF()
@@ -2421,7 +2496,7 @@ private struct PPTXRepairActionCard: View {
     }
 
     private var warningColor: Color {
-        Color(red: 0.78, green: 0.47, blue: 0.06)
+        MaterialTheme.accentWarning
     }
 }
 
@@ -2503,6 +2578,93 @@ private struct PreflightNoteRow: View {
     }
 }
 
+private struct PrecisionSafetyCard: View {
+    var element: EditorElement
+    var onLocate: (String) -> Void
+
+    var body: some View {
+        if let status = element.chiseloPrecisionSafetyStatus {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: status.icon)
+                        .font(.system(size: 12, weight: .heavy))
+                        .foregroundStyle(status.color)
+                        .frame(width: 22, height: 22)
+                        .background(status.color.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(status.title)
+                            .font(.system(size: 12, weight: .heavy))
+                            .foregroundStyle(MaterialTheme.ink)
+                        Text(status.detail)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(MaterialTheme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+
+                if !status.operations.isEmpty {
+                    HStack(spacing: 5) {
+                        ForEach(status.operations.prefix(4), id: \.self) { operation in
+                            Text(operation)
+                                .font(.system(size: 9, weight: .heavy))
+                                .foregroundStyle(status.color)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(status.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
+                                .lineLimit(1)
+                        }
+                    }
+                }
+
+                if status.targetId != nil || status.containerId != nil {
+                    HStack(spacing: 7) {
+                        if let targetId = status.targetId {
+                            Button {
+                                onLocate(targetId)
+                            } label: {
+                                Label("Object", systemImage: "scope")
+                            }
+                            .buttonStyle(CompactInspectorButtonStyle(color: status.color))
+                        }
+
+                        if let containerId = status.containerId, containerId != status.targetId {
+                            Button {
+                                onLocate(containerId)
+                            } label: {
+                                Label("Parent", systemImage: "rectangle.inset.filled")
+                            }
+                            .buttonStyle(CompactInspectorButtonStyle(color: MaterialTheme.primary))
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .background(status.color.opacity(0.07), in: RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium))
+            .overlay(
+                RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
+                    .stroke(status.color.opacity(0.22), lineWidth: 1)
+            )
+        }
+    }
+}
+
+private struct CompactInspectorButtonStyle: ButtonStyle {
+    var color: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 10, weight: .heavy))
+            .foregroundStyle(color)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(color.opacity(configuration.isPressed ? 0.18 : 0.10), in: RoundedRectangle(cornerRadius: 6))
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+    }
+}
+
 private struct EditableVersionSummary: Equatable {
     var pageCount: Int
     var totalObjects: Int
@@ -2555,8 +2717,8 @@ private struct EditableVersionSummary: Equatable {
     }
 
     var qualityColor: Color {
-        if pptxEditabilityScore >= 85 { return Color(red: 0.06, green: 0.52, blue: 0.26) }
-        if pptxEditabilityScore >= 65 { return Color(red: 0.78, green: 0.47, blue: 0.06) }
+        if pptxEditabilityScore >= 85 { return MaterialTheme.accentSuccess }
+        if pptxEditabilityScore >= 65 { return MaterialTheme.accentWarning }
         return MaterialTheme.accentDanger
     }
 }
@@ -2701,284 +2863,6 @@ private extension EditorDeck {
             canvasFallbackCount: canvasFallbacks,
             pptxEditabilityScore: score
         )
-    }
-}
-
-private extension HTMLDiagnostics {
-    var preflightSummary: String {
-        if blockingExportRiskCount > 0 {
-            return "\(blockingExportRiskCount) to resolve first"
-        }
-        if pptxReviewRiskCount > 0 {
-            return "\(pptxReviewRiskCount) need review after export"
-        }
-        if (visualChangeCount ?? 0) > 0 {
-            return "\(visualChangeCount ?? 0) visual change(s) awaiting review"
-        }
-        return "HTML, PDF, and PPTX are ready for export review"
-    }
-
-    var preflightIcon: String {
-        if blockingExportRiskCount > 0 { return "exclamationmark.triangle.fill" }
-        if pptxReviewRiskCount > 0 { return "checklist" }
-        if (visualChangeCount ?? 0) > 0 { return "rectangle.2.swap" }
-        return "checkmark.seal.fill"
-    }
-
-    var blockingExportRiskCount: Int {
-        var count = 0
-        count += brokenImages
-        count += brokenMedia
-        if !cleanExport { count += 1 }
-        count += textOverflowCount ?? 0
-        count += outOfBoundsCount ?? 0
-        count += overlayBlockerCount ?? 0
-        return count
-    }
-
-    var pptxReviewRiskCount: Int {
-        var count = 0
-        if tableCount > 0 { count += 1 }
-        if spanTableCount > 0 { count += 1 }
-        if svgCount > 0 { count += 1 }
-        if (pptxEffectRiskCount ?? 0) > 0 { count += 1 }
-        if (overlapCount ?? 0) > 0 { count += 1 }
-        if runtimeCompatibilityRiskCount > 0 { count += 1 }
-        return count
-    }
-
-    var runtimeCompatibilityRiskCount: Int {
-        runtimeRiskCount ?? 0
-    }
-
-    var pptxNativeObjectCount: Int {
-        (pptxTextObjectCount ?? 0) + (pptxImageObjectCount ?? 0) + (pptxShapeObjectCount ?? 0)
-    }
-
-    var pptxMappingTotalObjectCount: Int {
-        pptxNativeObjectCount + (pptxReviewObjectCount ?? 0) + (pptxFallbackObjectCount ?? 0)
-    }
-
-    var pptxEditableEstimate: Int {
-        let total = pptxMappingTotalObjectCount
-        guard total > 0 else { return 100 }
-        return boundedScore(Int((Double(pptxNativeObjectCount) / Double(total) * 100).rounded()))
-    }
-
-    var pptxMappingRecommendation: String {
-        if (pptxFallbackObjectCount ?? 0) > 0 {
-            return "Some objects can only be kept whole or carry high risk. For editable PPTX, convert to an editable version first; for exact visual fidelity, export PDF instead."
-        }
-        if (pptxReviewObjectCount ?? 0) > 0 {
-            return "Most objects export as editable, but tables, vectors, complex effects, and layered objects need close review after export."
-        }
-        return "Mostly text, images, and simple shapes, which suits editable PPTX export. Still spot-check text boxes and images."
-    }
-
-    var hasPPTXRepairActions: Bool {
-        tableCount > 0
-            || svgCount > 0
-            || (pptxEffectRiskCount ?? 0) > 0
-            || (overlapCount ?? 0) > 0
-            || shouldOfferEditableConversion
-            || shouldOfferPDFFallback
-    }
-
-    var shouldOfferEditableConversion: Bool {
-        (pptxFallbackObjectCount ?? 0) > 0 || runtimeCompatibilityRiskCount > 0
-    }
-
-    var shouldOfferPDFFallback: Bool {
-        (pptxFallbackObjectCount ?? 0) > 0
-            || (pptxEffectRiskCount ?? 0) > 0
-            || pptxEditabilityScore < 65
-    }
-
-    var pptxTextTargetIds: [String] {
-        normalizedTargetIds(pptxTextElementIds, fallback: pptxTextElementId)
-    }
-
-    var pptxImageTargetIds: [String] {
-        normalizedTargetIds(pptxImageElementIds, fallback: pptxImageElementId)
-    }
-
-    var pptxShapeTargetIds: [String] {
-        normalizedTargetIds(pptxShapeElementIds, fallback: pptxShapeElementId)
-    }
-
-    var pptxReviewTargetIds: [String] {
-        normalizedTargetIds(pptxReviewElementIds, fallback: pptxReviewElementId)
-    }
-
-    var pptxFallbackTargetIds: [String] {
-        normalizedTargetIds(pptxFallbackElementIds, fallback: pptxFallbackElementId)
-    }
-
-    var visualChangePreviewCanvasWidth: Int {
-        if let visualChangeCanvasWidth, visualChangeCanvasWidth > 0 {
-            return visualChangeCanvasWidth
-        }
-        return max(visualChangePreviewItems.map { $0.x + $0.w }.max() ?? 1, 1)
-    }
-
-    var visualChangePreviewCanvasHeight: Int {
-        if let visualChangeCanvasHeight, visualChangeCanvasHeight > 0 {
-            return visualChangeCanvasHeight
-        }
-        return max(visualChangePreviewItems.map { $0.y + $0.h }.max() ?? 1, 1)
-    }
-
-    var runtimeCompatibilityDetail: String {
-        let risks = runtimeCompatibilityRiskCount
-        if risks == 0 {
-            return "Ordinary HTML objects, ready for direct refinement"
-        }
-
-        var parts: [String] = []
-        if (scriptCount ?? 0) > 0 || (runtimeRootCount ?? 0) > 0 {
-            parts.append("script-rendered content")
-        }
-        if (iframeCount ?? 0) > 0 {
-            parts.append("\(iframeCount ?? 0) embedded page(s)")
-        }
-        if (canvasCount ?? 0) > 0 {
-            parts.append("\(canvasCount ?? 0) canvas region(s)")
-        }
-        if (shadowRootCount ?? 0) > 0 {
-            parts.append("\(shadowRootCount ?? 0) encapsulated component(s)")
-        }
-        if (overlayBlockerCount ?? 0) > 0 {
-            parts.append("\(overlayBlockerCount ?? 0) overlay(s)")
-        }
-        if (externalResourceCount ?? 0) > 0 {
-            parts.append("\(externalResourceCount ?? 0) external resource(s)")
-        }
-        return parts.isEmpty ? "\(risks) dynamic content risk(s)" : parts.joined(separator: ", ")
-    }
-
-    var responsiveReviewDetail: String {
-        let responsiveRules = responsiveRuleCount ?? 0
-        let responsiveRisks = responsiveLayoutRiskCount ?? 0
-        let responsiveChanges = responsiveChangeCount ?? 0
-        let widthSuffix = responsiveReviewWidthText.isEmpty ? "narrow and wide widths" : responsiveReviewWidthText
-        if responsiveChanges > 0 {
-            return "\(responsiveChanges) changed object(s) sit inside responsive rules or flex/grid/sticky layout chains. Check \(widthSuffix) before exporting."
-        }
-        if responsiveRisks == 0 {
-            return "No significant responsive rules detected. A normal width review is enough."
-        }
-        if responsiveRules > 0 {
-            return "\(responsiveRules) responsive or container rule(s). Check \(widthSuffix) after editing."
-        }
-        return "\(responsiveRisks) flex/grid/sticky layout object(s). Preview at multiple widths after editing."
-    }
-
-    var responsiveReviewWidthText: String {
-        let widths = (responsiveReviewWidths ?? []).filter { $0 > 0 }.prefix(4)
-        guard !widths.isEmpty else { return "" }
-        return "widths near breakpoints \(widths.map { "\($0)" }.joined(separator: " / "))px"
-    }
-
-    var sourcePollutionReviewCount: Int {
-        max(0, inlineStyleChangeCount ?? 0)
-            + max(0, externalStylesheetAffectedChangeCount ?? 0)
-            + max(0, stylesheetRuleWritebackCount ?? 0)
-    }
-
-    var sourcePollutionReviewDetail: String {
-        let inlineChanges = inlineStyleChangeCount ?? 0
-        let ruleWrites = stylesheetRuleWritebackCount ?? 0
-        let stylesheets = stylesheetCount ?? 0
-        let externalSheets = externalStylesheetCount ?? 0
-        let externalAffectedChanges = externalStylesheetAffectedChangeCount ?? 0
-        let ruleTargets = stylesheetRuleWritebackTargets.prefix(3).joined(separator: ", ")
-        let ruleTargetSuffix = ruleTargets.isEmpty ? "" : " (\(ruleTargets))"
-        if ruleWrites > 0 && inlineChanges == 0 {
-            return "\(ruleWrites) style change(s) written to local CSS rules\(ruleTargetSuffix), which keeps the source easier to maintain."
-        }
-        if ruleWrites > 0 && inlineChanges > 0 {
-            return "\(ruleWrites) write(s) to CSS rules\(ruleTargetSuffix); \(inlineChanges) object(s) still write to inline style."
-        }
-        if inlineChanges > 0 && stylesheets > 0 {
-            return "\(inlineChanges) change(s) written to inline style; the original has \(stylesheets) stylesheet(s), so spot-check the source before saving."
-        }
-        if externalAffectedChanges > 0 {
-            return "\(externalAffectedChanges) changed object(s) may be affected by \(externalSheets) external stylesheet(s). Review widths and class effects before saving."
-        }
-        if inlineChanges > 0 {
-            return "\(inlineChanges) object(s) had inline style written back."
-        }
-        return "No significant source pollution risk detected."
-    }
-
-    var htmlReadinessScore: Int {
-        boundedScore(
-            100
-            - (brokenImages + brokenMedia) * 18
-            - (cleanExport ? 0 : 30)
-            - (textOverflowCount ?? 0) * 10
-            - (outOfBoundsCount ?? 0) * 10
-            - min(12, (overlayBlockerCount ?? 0) * 6)
-            - min(8, (responsiveLayoutRiskCount ?? 0) * 2)
-            - min(18, (overlapCount ?? 0) * 3)
-        )
-    }
-
-    var pdfFidelityScore: Int {
-        boundedScore(
-            100
-            - (brokenImages + brokenMedia) * 22
-            - (textOverflowCount ?? 0) * 12
-            - (outOfBoundsCount ?? 0) * 12
-            - min(10, (overlayBlockerCount ?? 0) * 5)
-            - min(20, (overlapCount ?? 0) * 4)
-        )
-    }
-
-    var pptxEditabilityScore: Int {
-        boundedScore(
-            100
-            - (brokenImages + brokenMedia) * 16
-            - (textOverflowCount ?? 0) * 8
-            - (outOfBoundsCount ?? 0) * 8
-            - min(18, (overlapCount ?? 0) * 5)
-            - min(16, tableCount * 4)
-            - (spanTableCount > 0 ? 18 : 0)
-            - min(20, svgCount * 6)
-            - min(22, (pptxEffectRiskCount ?? 0) * 4)
-            - min(28, runtimeCompatibilityRiskCount * 4)
-        )
-    }
-
-    var overallExportScore: Int {
-        min(htmlReadinessScore, pdfFidelityScore, pptxEditabilityScore)
-    }
-
-    var pptxRiskSummary: String {
-        if pptxEditabilityScore >= 85 {
-            return "PPTX editability is good. Spot-check text boxes and images after export."
-        }
-        if pptxEditabilityScore >= 65 {
-            return "PPTX editability is moderate. After export, focus on tables, SVG, complex effects, dynamic components, and layering."
-        }
-        return "PPTX editability risk is high. Resolve the red issues first, then review complex effects, script-rendered content, embedded pages, and whole objects."
-    }
-
-    private func boundedScore(_ value: Int) -> Int {
-        min(100, max(0, value))
-    }
-
-    private func normalizedTargetIds(_ values: [String]?, fallback: String?) -> [String] {
-        var seen = Set<String>()
-        var ids: [String] = []
-        for value in values ?? [] {
-            guard !value.isEmpty, seen.insert(value).inserted else { continue }
-            ids.append(value)
-        }
-        if let fallback, !fallback.isEmpty, seen.insert(fallback).inserted {
-            ids.append(fallback)
-        }
-        return ids
     }
 }
 
@@ -3210,7 +3094,7 @@ private struct DocumentNavigator: View {
                         HTMLDocumentCard()
                         HTMLDeliveryCheckCard(diagnostics: model.htmlDiagnostics)
 
-                        if !model.htmlTree.isEmpty {
+                        if model.workspaceMode == .advanced, !model.htmlTree.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Object Structure")
                                     .font(.caption)
@@ -3337,424 +3221,6 @@ private struct CSSLinearGradient {
     var stops: [Gradient.Stop]
 }
 
-private struct HTMLDocumentCard: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
-            .fill(MaterialTheme.surface)
-            .aspectRatio(4.0 / 3.0, contentMode: .fit)
-            .overlay(
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("HTML")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .tracking(1.2)
-                        .foregroundStyle(MaterialTheme.primary)
-                    Text("HTML Page")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(MaterialTheme.ink)
-                    Spacer()
-                    Text("Click the content or the structure")
-                        .font(.caption2)
-                        .foregroundStyle(MaterialTheme.muted)
-                }
-                .padding(8),
-                alignment: .topLeading
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
-                    .stroke(MaterialTheme.primary.opacity(0.24), lineWidth: 1)
-            )
-            .shadow(color: MaterialTheme.shadow.opacity(0.18), radius: 8, x: 0, y: 3)
-    }
-}
-
-private struct HTMLDeliveryCheckCard: View {
-    @EnvironmentObject private var model: EditorModel
-
-    var diagnostics: HTMLDiagnostics
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: headerIcon)
-                    .font(.system(size: 12, weight: .heavy))
-                    .foregroundStyle(headerColor)
-                    .frame(width: 22, height: 22)
-                    .background(headerColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Delivery Check")
-                        .font(.system(size: 12, weight: .heavy))
-                        .foregroundStyle(MaterialTheme.ink)
-                    Text(headerSubtitle)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(headerColor)
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            VStack(spacing: 7) {
-                DeliveryCheckRow(
-                    icon: resourceIcon,
-                    title: "Resources",
-                    detail: resourceDetail,
-                    color: resourceColor,
-                    isClickable: diagnostics.resourceElementId != nil
-                ) {
-                    if let elementId = diagnostics.resourceElementId {
-                        model.selectHTMLNode(id: elementId)
-                    }
-                }
-
-                DeliveryCheckRow(
-                    icon: diagnostics.cleanExport ? "checkmark.seal" : "exclamationmark.triangle",
-                    title: "Source cleanliness",
-                    detail: diagnostics.sourceCleanlinessDetail,
-                    color: diagnostics.cleanExport ? successColor : MaterialTheme.accentDanger,
-                    isClickable: false
-                )
-
-                if (diagnostics.visualChangeCount ?? 0) > 0 {
-                    DeliveryCheckRow(
-                        icon: "rectangle.2.swap",
-                        title: "Visual Changes",
-                        detail: "\(diagnostics.visualChangeCount ?? 0) object(s) changed since open",
-                        color: warningColor,
-                        isClickable: !diagnostics.visualChangeTargetIds.isEmpty
-                    ) {
-                        if let elementId = diagnostics.visualChangeTargetIds.first {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if diagnostics.runtimeCompatibilityRiskCount > 0 {
-                    DeliveryCheckRow(
-                        icon: "wand.and.rays",
-                        title: "Dynamic content risk",
-                        detail: diagnostics.runtimeCompatibilityDetail,
-                        color: warningColor,
-                        isClickable: diagnostics.runtimeRiskElementId != nil
-                    ) {
-                        if let elementId = diagnostics.runtimeRiskElementId {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if diagnostics.responsiveLayoutRiskCount ?? 0 > 0 {
-                    DeliveryCheckRow(
-                        icon: "rectangle.split.3x1",
-                        title: "Multi-width review",
-                        detail: diagnostics.responsiveReviewDetail,
-                        color: warningColor,
-                        isClickable: false
-                    )
-                }
-
-                if diagnostics.sourcePollutionReviewCount > 0 {
-                    DeliveryCheckRow(
-                        icon: "curlybraces.square",
-                        title: "Source Review",
-                        detail: diagnostics.sourcePollutionReviewDetail,
-                        color: warningColor,
-                        isClickable: !diagnostics.sourceWritebackTargetIds.isEmpty
-                    ) {
-                        if let elementId = diagnostics.sourceWritebackTargetIds.first {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if diagnostics.tableCount > 0 {
-                    DeliveryCheckRow(
-                        icon: diagnostics.spanTableCount > 0 ? "tablecells.badge.ellipsis" : "tablecells",
-                        title: "Tables",
-                        detail: diagnostics.spanTableCount > 0 ? "\(diagnostics.tableCount) table(s), \(diagnostics.spanTableCount) with merged cells" : "\(diagnostics.tableCount) table(s)",
-                        color: diagnostics.spanTableCount > 0 ? warningColor : successColor,
-                        isClickable: diagnostics.tableElementId != nil
-                    ) {
-                        if let elementId = diagnostics.tableElementId {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if diagnostics.svgCount > 0 {
-                    DeliveryCheckRow(
-                        icon: "scribble.variable",
-                        title: "SVG",
-                        detail: "\(diagnostics.svgCount) SVG/vector graphic(s)",
-                        color: warningColor,
-                        isClickable: diagnostics.svgElementId != nil
-                    ) {
-                        if let elementId = diagnostics.svgElementId {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if (diagnostics.textOverflowCount ?? 0) > 0 {
-                    DeliveryCheckRow(
-                        icon: "text.badge.exclamationmark",
-                        title: "Text",
-                        detail: "\(diagnostics.textOverflowCount ?? 0) text overflow(s)",
-                        color: MaterialTheme.accentDanger,
-                        isClickable: diagnostics.textOverflowElementId != nil
-                    ) {
-                        if let elementId = diagnostics.textOverflowElementId {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if (diagnostics.outOfBoundsCount ?? 0) > 0 {
-                    DeliveryCheckRow(
-                        icon: "arrow.up.left.and.arrow.down.right",
-                        title: "Bounds",
-                        detail: "\(diagnostics.outOfBoundsCount ?? 0) element(s) outside the page",
-                        color: MaterialTheme.accentDanger,
-                        isClickable: diagnostics.outOfBoundsElementId != nil
-                    ) {
-                        if let elementId = diagnostics.outOfBoundsElementId {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-
-                if (diagnostics.overlapCount ?? 0) > 0 {
-                    DeliveryCheckRow(
-                        icon: "square.stack.3d.up",
-                        title: "Overlap",
-                        detail: "\(diagnostics.overlapCount ?? 0) noticeable overlap(s)",
-                        color: warningColor,
-                        isClickable: diagnostics.overlapElementId != nil
-                    ) {
-                        if let elementId = diagnostics.overlapElementId {
-                            model.selectHTMLNode(id: elementId)
-                        }
-                    }
-                }
-            }
-
-            if !visibleIssues.isEmpty {
-                Divider()
-                    .overlay(MaterialTheme.hairline)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Issue Locator")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(MaterialTheme.muted)
-
-                    ForEach(visibleIssues) { issue in
-                        DeliveryIssueRow(issue: issue) {
-                            if let elementId = issue.elementId {
-                                model.selectHTMLNode(id: elementId)
-                            }
-                        }
-                    }
-
-                    if hiddenIssueCount > 0 {
-                        Text("\(hiddenIssueCount) more will appear as these are resolved")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(MaterialTheme.muted)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .background(MaterialTheme.surfaceStrong, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium))
-        .overlay(
-            RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
-                .stroke(MaterialTheme.hairline, lineWidth: 1)
-        )
-        .shadow(color: MaterialTheme.shadow.opacity(0.10), radius: 8, x: 0, y: 3)
-    }
-
-    private var headerIcon: String {
-        diagnostics.issueCount > 0 ? "exclamationmark.triangle.fill" : "checkmark.seal.fill"
-    }
-
-    private var headerSubtitle: String {
-        if diagnostics.issueCount > 0 { return "\(diagnostics.issueCount) risk(s)" }
-        if diagnostics.warningCount > 0 { return "\(diagnostics.warningCount) note(s)" }
-        return "Ready to deliver"
-    }
-
-    private var headerColor: Color {
-        if diagnostics.issueCount > 0 { return MaterialTheme.accentDanger }
-        if diagnostics.warningCount > 0 { return warningColor }
-        return successColor
-    }
-
-    private var resourceIcon: String {
-        diagnostics.brokenImages + diagnostics.brokenMedia > 0 ? "photo.badge.exclamationmark" : "photo.on.rectangle"
-    }
-
-    private var resourceDetail: String {
-        let broken = diagnostics.brokenImages + diagnostics.brokenMedia
-        if broken > 0 {
-            return "\(diagnostics.brokenImages) broken image(s), \(diagnostics.brokenMedia) broken media file(s)"
-        }
-
-        let embedded = diagnostics.embeddedImages ?? 0
-        if diagnostics.imageCount == 0 && diagnostics.mediaCount == 0 { return "No external images or media" }
-        if embedded > 0 { return "\(diagnostics.imageCount) image(s), \(embedded) embedded" }
-        return "\(diagnostics.imageCount) image(s), \(diagnostics.mediaCount) media file(s)"
-    }
-
-    private var resourceColor: Color {
-        diagnostics.brokenImages + diagnostics.brokenMedia > 0 ? MaterialTheme.accentDanger : successColor
-    }
-
-    private var successColor: Color {
-        Color(red: 0.06, green: 0.52, blue: 0.26)
-    }
-
-    private var warningColor: Color {
-        Color(red: 0.78, green: 0.47, blue: 0.06)
-    }
-
-    private var visibleIssues: [HTMLDiagnosticIssue] {
-        Array((diagnostics.issues ?? []).prefix(5))
-    }
-
-    private var hiddenIssueCount: Int {
-        max(0, (diagnostics.issues ?? []).count - visibleIssues.count)
-    }
-}
-
-private struct DeliveryCheckRow: View {
-    var icon: String
-    var title: String
-    var detail: String
-    var color: Color
-    var isClickable: Bool = false
-    var action: (() -> Void)? = nil
-
-    var body: some View {
-        Button {
-            action?()
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .heavy))
-                    .foregroundStyle(color)
-                    .frame(width: 18, height: 18)
-                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(title)
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(MaterialTheme.ink)
-                    Text(detail)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(MaterialTheme.muted)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                }
-
-                Spacer(minLength: 0)
-
-                if isClickable {
-                    Image(systemName: "scope")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundStyle(MaterialTheme.primary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!isClickable)
-        .opacity(isClickable ? 1 : 0.88)
-    }
-}
-
-private struct DeliveryIssueRow: View {
-    var issue: HTMLDiagnosticIssue
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .heavy))
-                    .foregroundStyle(color)
-                    .frame(width: 18, height: 18)
-                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(issue.title)
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(MaterialTheme.ink)
-                        .lineLimit(1)
-                    Text(issue.detail)
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(MaterialTheme.muted)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.8)
-                }
-
-                Spacer(minLength: 0)
-
-                if issue.elementId != nil {
-                    Image(systemName: "scope")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundStyle(MaterialTheme.primary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(issue.elementId == nil)
-        .opacity(issue.elementId == nil ? 0.72 : 1)
-    }
-
-    private var icon: String {
-        switch issue.kind {
-        case "broken-image", "broken-media":
-            return "photo.badge.exclamationmark"
-        case "text-overflow":
-            return "text.badge.exclamationmark"
-        case "out-of-bounds":
-            return "arrow.up.left.and.arrow.down.right"
-        case "overlap":
-            return "square.stack.3d.up"
-        case "span-table":
-            return "tablecells.badge.ellipsis"
-        case "pptx-effect-risk":
-            return "camera.filters"
-        case "visual-change":
-            return "rectangle.2.swap"
-        case "responsive-review":
-            return "rectangle.split.3x1"
-        case "source-pollution-review", "stylesheet-edit-review":
-            return "curlybraces.square"
-        case "runtime-rendered", "external-runtime-resource":
-            return "wand.and.rays"
-        case "iframe-content":
-            return "rectangle.inset.filled"
-        case "canvas-content":
-            return "square.dashed"
-        case "shadow-content":
-            return "shippingbox"
-        case "selection-overlay":
-            return "rectangle.stack.badge.minus"
-        default:
-            return issue.severity == "error" ? "exclamationmark.triangle" : "info.circle"
-        }
-    }
-
-    private var color: Color {
-        issue.severity == "error" ? MaterialTheme.accentDanger : Color(red: 0.78, green: 0.47, blue: 0.06)
-    }
-}
 
 private struct SlideThumbnailView: View, Equatable {
     private static let maxPreviewElements = 90
@@ -4077,6 +3543,9 @@ private struct HTMLTreeRow: View, Equatable {
             }
             .buttonStyle(.plain)
             .help(node.path)
+            .accessibilityLabel("\(node.chiseloTypeLabel): \(node.label)")
+            .accessibilityHint("Select this object")
+            .accessibilityValue(isSelected ? "Selected" : "Not selected")
 
             if let children = node.children {
                 ForEach(children) { child in
@@ -4102,10 +3571,11 @@ private struct HTMLTreeRow: View, Equatable {
 }
 
 private enum InspectorTab: String, CaseIterable, Identifiable {
-    case layout = "Geometry"
-    case style = "Style"
-    case arrange = "Arrange"
-    case html = "Refine"
+    case content = "Content"
+    case style = "Appearance"
+    case layout = "Position"
+    case arrange = "Layers"
+    case html = "Source"
 
     var id: String { rawValue }
 }
@@ -4147,16 +3617,27 @@ private struct GeometryMetrics {
 
 private struct InspectorPanel: View {
     @EnvironmentObject private var model: EditorModel
-    @State private var selectedTab: InspectorTab = .layout
+    @State private var selectedTab: InspectorTab = .content
     @State private var sourceDraft = ""
     @State private var sourceDraftElementID: String?
     @State private var sourceDraftOriginalSnippet = ""
+    @State private var htmlPseudoPreviewState = "none"
+    @State private var stylesheetRuleDraft = ""
+    @State private var stylesheetRuleDraftElementID: String?
+    @State private var stylesheetRuleOriginalSnippet = ""
+    @State private var stylesheetRuleValidationMessage: String?
+    @State private var stylesheetRuleValidationTask: Task<Void, Never>?
+    @State private var attributeDraftElementID: String?
+    @State private var classNameDraft = ""
+    @State private var inlineStyleDraft = ""
+    @State private var linkHrefDraft = ""
+    @State private var linkTargetDraft = ""
     @State private var pendingSourceDraftValidationID: UUID?
     @State private var sourceDraftValidationTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MaterialPanelHeader(title: "Inspector", subtitle: "Object controls")
+            MaterialPanelHeader(title: "Properties", subtitle: "Common edits")
                 .padding(MaterialTheme.panelPadding)
 
             if let element = model.selectedElement {
@@ -4179,15 +3660,25 @@ private struct InspectorPanel: View {
                 }
                 .onAppear {
                     syncSourceDraft(for: element)
+                    syncHTMLAttributeDrafts(for: element)
+                    syncStylesheetRuleDraft(for: element)
                 }
                 .onChange(of: element.id) { _ in
                     syncSourceDraft(for: element)
+                    syncHTMLAttributeDrafts(for: element)
+                    syncStylesheetRuleDraft(for: element)
                 }
                 .onChange(of: element.sourceSnippet) { _ in
                     syncSourceDraft(for: element)
                 }
+                .onChange(of: element.style?.writebackRuleSnippet) { _ in
+                    syncStylesheetRuleDraft(for: element)
+                }
                 .onChange(of: sourceDraft) { _ in
                     scheduleSourceDraftValidationPreview(for: element)
+                }
+                .onChange(of: stylesheetRuleDraft) { _ in
+                    scheduleStylesheetRuleValidation(for: element)
                 }
 
                 ScrollView {
@@ -4205,16 +3696,19 @@ private struct InspectorPanel: View {
     }
 
     private var availableTabs: [InspectorTab] {
-        model.documentMode == "html" ? InspectorTab.allCases : [.layout, .style, .arrange]
+        if model.workspaceMode == .ordinary {
+            return [.content, .style, .layout]
+        }
+        return model.documentMode == "html" ? InspectorTab.allCases : [.content, .style, .layout, .arrange]
     }
 
     private var activeTab: InspectorTab {
-        availableTabs.contains(selectedTab) ? selectedTab : .layout
+        availableTabs.contains(selectedTab) ? selectedTab : .content
     }
 
     private func normalizeSelectedTab() {
         if !availableTabs.contains(selectedTab) {
-            selectedTab = .layout
+            selectedTab = .content
         }
     }
 
@@ -4240,23 +3734,47 @@ private struct InspectorPanel: View {
         scheduleSourceDraftValidationPreview(for: element, delay: 0)
     }
 
+    private func syncHTMLAttributeDrafts(for element: EditorElement) {
+        attributeDraftElementID = element.id
+        classNameDraft = element.className ?? ""
+        inlineStyleDraft = element.inlineStyle ?? ""
+        linkHrefDraft = element.linkHref ?? ""
+        linkTargetDraft = element.linkTarget ?? ""
+    }
+
     @ViewBuilder
     private func inspectorContent(for element: EditorElement) -> some View {
+        if model.documentMode == "html" {
+            PrecisionSafetyCard(element: element) { elementId in
+                model.selectHTMLNode(id: elementId)
+            }
+        }
+
         switch activeTab {
+        case .content:
+            contentGroups(for: element)
         case .layout:
-            objectGroup(element)
             geometryGroup
-            quickAdjustGroup
-            alignmentGroup(for: element)
+            if !isGeometryLockedSelection {
+                quickAdjustGroup
+                alignmentGroup(for: element)
+            }
         case .style:
             styleGroups(for: element)
             boxStyleGroup
+            boxModelGroup
+            layoutGroup
+            miscStyleGroup
             htmlAssetGroups
         case .arrange:
-            layerStackGroup
-            layerGroup
-            alignmentGroup(for: element)
+            if !isGeometryLockedSelection {
+                layerStackGroup
+                layerGroup
+                alignmentGroup(for: element)
+            }
         case .html:
+            objectGroup(element)
+            htmlAttributesGroup(element)
             htmlSourceSyncGroup(element)
             htmlControlsGroup
         }
@@ -4272,7 +3790,7 @@ private struct InspectorPanel: View {
                     Text("Select an object")
                         .font(.headline)
                         .foregroundStyle(MaterialTheme.ink)
-                    Text("Position, layering, alignment, and other precise controls appear here.")
+                    Text("Select text, an image, a shape, or a table to show common edits here.")
                         .font(.callout)
                         .foregroundStyle(MaterialTheme.muted)
                 }
@@ -4293,27 +3811,6 @@ private struct InspectorPanel: View {
         GroupBox("Object") {
             VStack(alignment: .leading, spacing: 8) {
                 LabeledContent("Object", value: element.chiseloTypeLabel)
-                if let status = element.chiseloEditabilityStatus {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: status.icon)
-                            .font(.system(size: 11, weight: .heavy))
-                            .foregroundStyle(status.color)
-                            .frame(width: 18, height: 18)
-                            .background(status.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(status.title)
-                                .font(.system(size: 11, weight: .heavy))
-                                .foregroundStyle(MaterialTheme.ink)
-                            Text(status.detail)
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(MaterialTheme.muted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                    .padding(9)
-                    .background(MaterialTheme.surfaceTint, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall))
-                }
                 if let writeback = element.style?.writebackStatus {
                     SourceWritebackStatusBadge(status: writeback)
                 }
@@ -4346,9 +3843,144 @@ private struct InspectorPanel: View {
         }
     }
 
+    private func htmlAttributesGroup(_ element: EditorElement) -> some View {
+        GroupBox("HTML Attributes / CSS") {
+            VStack(alignment: .leading, spacing: 10) {
+                StyleTextField(label: "class", value: $classNameDraft)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("inline style")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(MaterialTheme.primary)
+                    TextEditor(text: $inlineStyleDraft)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(MaterialTheme.ink)
+                        .padding(8)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 58, maxHeight: 118)
+                        .background(MaterialInputBackground())
+                }
+
+                if supportsLinkAttributes(element) {
+                    Divider()
+                    StyleTextField(label: "href", value: $linkHrefDraft)
+                    StyleTextField(label: "target", value: $linkTargetDraft)
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        model.applySelectedHTMLAttributes(
+                            className: classNameDraft,
+                            inlineStyle: inlineStyleDraft,
+                            linkHref: supportsLinkAttributes(element) ? linkHrefDraft : "",
+                            linkTarget: supportsLinkAttributes(element) ? linkTargetDraft : ""
+                        )
+                    } label: {
+                        Label("Apply Attributes", systemImage: "checkmark.square")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MaterialButtonStyle(compact: true))
+                    .disabled(!canApplyHTMLAttributeDrafts(for: element))
+
+                    Button {
+                        syncHTMLAttributeDrafts(for: element)
+                    } label: {
+                        Label("Restore", systemImage: "arrow.uturn.backward")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(MaterialButtonStyle(compact: true))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func contentGroups(for element: EditorElement) -> some View {
+        if supportsTextControls(element) {
+            textContentGroup
+        }
+
+        if supportsImageControls(element) {
+            imageInfoGroup
+        }
+
+        if model.documentMode == "html", isTableSelection {
+            tableGroup
+        }
+
+        if model.documentMode == "html", isCellSelection {
+            cellStyleGroup
+        }
+
+        quickAdjustGroup
+    }
+
+    private var textContentGroup: some View {
+        GroupBox("Text Content") {
+            VStack(alignment: .leading, spacing: 8) {
+                TextEditor(text: textContentBinding(defaultValue: ""))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(MaterialTheme.ink)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .frame(minHeight: 76, maxHeight: 132)
+                    .background(MaterialInputBackground())
+
+                Text("This changes only the selected object's text. It does not change similar objects.")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(MaterialTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    @ViewBuilder
     private var geometryGroup: some View {
-        GroupBox("Geometry") {
+        if isGeometryLockedSelection {
+            GroupBox("Safe Table Editing") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Cells remain in the table flow. This prevents position or size changes from moving or clipping other cells.")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MaterialTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                        GridRow {
+                            CommandButton(title: "Edit Text", icon: "text.cursor", command: "editText")
+                            CommandButton(title: "Whole Table", icon: "tablecells", command: "selectTable")
+                        }
+                    }
+
+                    if isTableSelection {
+                        tableOperationGrid
+                    }
+
+                    if isCellSelection {
+                        cellActionGrid
+                    }
+                }
+            }
+        } else {
+            GroupBox("Geometry") {
             VStack(alignment: .leading, spacing: 12) {
+                if let notice = model.selectedElement?.chiseloGeometrySafetyNotice {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: notice.icon)
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(notice.color)
+                            .frame(width: 18, height: 18)
+                            .background(notice.color.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
+
+                        Text(notice.detail)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(MaterialTheme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(9)
+                    .background(notice.color.opacity(0.07), in: RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall))
+                }
+
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
                     GridRow {
                         NumberField(label: "X", value: binding(\.x))
@@ -4391,10 +4023,13 @@ private struct InspectorPanel: View {
                 }
             }
         }
+        }
     }
 
+    @ViewBuilder
     private var quickAdjustGroup: some View {
-        GroupBox("Quick Adjust") {
+        if !isGeometryLockedSelection {
+            GroupBox("Quick Adjustments") {
             VStack(spacing: 10) {
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
@@ -4444,6 +4079,7 @@ private struct InspectorPanel: View {
                 }
             }
         }
+        }
     }
 
     private var textStyleGroup: some View {
@@ -4477,8 +4113,8 @@ private struct InspectorPanel: View {
 
     @ViewBuilder
     private func styleGroups(for element: EditorElement) -> some View {
-        if let writeback = element.style?.writebackStatus {
-            styleWritebackGroup(writeback)
+        if let style = element.style, style.writebackStatus != nil {
+            styleWritebackGroup(style)
         }
 
         if supportsTextControls(element) {
@@ -4490,10 +4126,211 @@ private struct InspectorPanel: View {
         }
     }
 
-    private func styleWritebackGroup(_ status: EditorElementStyle.WritebackStatus) -> some View {
-        GroupBox("Source Writeback") {
-            SourceWritebackStatusBadge(status: status)
+    @ViewBuilder
+    private func styleWritebackGroup(_ style: EditorElementStyle) -> some View {
+        if let status = style.writebackStatus {
+            GroupBox("Source Writeback") {
+            VStack(alignment: .leading, spacing: 10) {
+                SourceWritebackStatusBadge(status: status)
+
+                if let ruleLine = status.ruleLine {
+                    Text("Approximate rule line: \(ruleLine)")
+                        .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(status.color)
+                }
+
+                if let ruleSnippet = status.ruleSnippet {
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        Text(ruleSnippet)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(MaterialTheme.ink)
+                            .textSelection(.enabled)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 52, maxHeight: 120, alignment: .topLeading)
+                    .background(MaterialTheme.surfaceTint, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
+                            .stroke(MaterialTheme.hairline, lineWidth: 1)
+                    )
+                }
+
+                HStack(spacing: 8) {
+                    if let ruleSnippet = status.ruleSnippet {
+                        Button {
+                            copySourceSnippet(ruleSnippet)
+                            model.status = "CSS rule snippet copied"
+                        } label: {
+                            Label("Copy Rule", systemImage: "doc.on.doc")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MaterialButtonStyle(compact: true))
+                    }
+
+                    if status.target != nil {
+                        Button {
+                            model.selectNodesForSelectedStylesheetRule()
+                        } label: {
+                            Label("Select Matching Objects", systemImage: "scope")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MaterialButtonStyle(compact: true))
+                    }
+
+                    if let sourceURL = status.sourceURL, !sourceURL.isEmpty {
+                        Button {
+                            model.revealLocalResource(urlString: sourceURL)
+                        } label: {
+                            Label("Locate File", systemImage: "folder")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MaterialButtonStyle(compact: true))
+                    }
+                }
+
+                if let ruleSnippet = status.ruleSnippet {
+                    Divider()
+
+                    Text("Rule Editor")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(MaterialTheme.muted)
+
+                    ScrollView(.horizontal, showsIndicators: true) {
+                        TextEditor(text: $stylesheetRuleDraft)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(MaterialTheme.ink)
+                            .padding(10)
+                            .scrollContentBackground(.hidden)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(minHeight: 72, maxHeight: 180, alignment: .topLeading)
+                    .background(MaterialTheme.surfaceTint, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
+                            .stroke(MaterialTheme.hairline, lineWidth: 1)
+                    )
+
+                    if let validationMessage = stylesheetRuleValidationMessage,
+                       stylesheetRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines) != ruleSnippet.trimmingCharacters(in: .whitespacesAndNewlines) {
+                        Text(validationMessage)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(MaterialTheme.accentDanger)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            restoreStylesheetRuleDraft(for: style)
+                        } label: {
+                            Label("Restore", systemImage: "arrow.uturn.backward")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MaterialButtonStyle(compact: true))
+                        .disabled(!canRestoreStylesheetRuleDraft(for: style))
+
+                        Button {
+                            model.applySelectedStylesheetRule(stylesheetRuleDraft)
+                        } label: {
+                            Label("Apply Rule", systemImage: "checkmark.square")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(MaterialButtonStyle(compact: true))
+                        .disabled(!canApplyStylesheetRuleDraft(for: style))
+                    }
+                }
+
+                if let matchSummary = style.writebackMatchSummary, !matchSummary.items.isEmpty {
+                    Divider()
+                    stylesheetRuleMatchSummaryGroup(matchSummary)
+                }
+            }
         }
+        }
+    }
+
+    private func stylesheetRuleMatchSummaryGroup(_ summary: StylesheetRuleMatchSummary) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "scope")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(MaterialTheme.primary)
+                Text("Matching Objects")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(MaterialTheme.ink)
+                Text("\(summary.count)")
+                    .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(MaterialTheme.primaryDark)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(MaterialTheme.primary.opacity(0.10), in: RoundedRectangle(cornerRadius: 5))
+                Spacer(minLength: 0)
+            }
+
+            LazyVStack(spacing: 5) {
+                ForEach(summary.items) { item in
+                    stylesheetRuleMatchRow(item, selector: summary.selector)
+                }
+
+                if summary.count > summary.items.count {
+                    Text("\(summary.count - summary.items.count) more objects match. Use Select Matching Objects to review the complete group.")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(MaterialTheme.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 1)
+                }
+            }
+        }
+        .padding(8)
+        .background(MaterialTheme.surfaceTint, in: RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall))
+        .overlay(
+            RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
+                .stroke(MaterialTheme.hairline, lineWidth: 1)
+        )
+    }
+
+    private func stylesheetRuleMatchRow(_ item: EditorSourceNodeItem, selector: String) -> some View {
+        Button {
+            locateSourceNodeItem(item, statusPrefix: "Located matching rule object")
+        } label: {
+            HStack(alignment: .top, spacing: 7) {
+                Text(item.tagName.uppercased())
+                    .font(.system(size: 8, weight: .heavy, design: .monospaced))
+                    .foregroundStyle(MaterialTheme.primaryDark)
+                    .frame(width: 38, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.label.isEmpty ? item.tagName : item.label)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(MaterialTheme.ink)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    Text(item.path)
+                        .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(MaterialTheme.muted)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "scope")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(MaterialTheme.primary)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(Color.white.opacity(0.42), in: RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(MaterialTheme.separator, lineWidth: 1)
+        )
+        .help("\(selector)\n\(item.path)")
     }
 
     private var imageInfoGroup: some View {
@@ -4552,6 +4389,170 @@ private struct InspectorPanel: View {
         }
     }
 
+    private var boxModelGroup: some View {
+        GroupBox("Box Model") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Padding")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(MaterialTheme.muted)
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow {
+                        NumberField(label: "Top", value: styleDoubleBinding(\.paddingTop, defaultValue: 0))
+                        NumberField(label: "Right", value: styleDoubleBinding(\.paddingRight, defaultValue: 0))
+                    }
+                    GridRow {
+                        NumberField(label: "Bottom", value: styleDoubleBinding(\.paddingBottom, defaultValue: 0))
+                        NumberField(label: "Left", value: styleDoubleBinding(\.paddingLeft, defaultValue: 0))
+                    }
+                }
+                Text("Margin")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(MaterialTheme.muted)
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow {
+                        NumberField(label: "Top", value: styleDoubleBinding(\.marginTop, defaultValue: 0))
+                        NumberField(label: "Right", value: styleDoubleBinding(\.marginRight, defaultValue: 0))
+                    }
+                    GridRow {
+                        NumberField(label: "Bottom", value: styleDoubleBinding(\.marginBottom, defaultValue: 0))
+                        NumberField(label: "Left", value: styleDoubleBinding(\.marginLeft, defaultValue: 0))
+                    }
+                }
+            }
+        }
+    }
+
+    private var layoutGroup: some View {
+        GroupBox("Layout") {
+            VStack(alignment: .leading, spacing: 12) {
+                styleChoiceRow(
+                    title: "Display",
+                    value: styleStringBinding(\.display, defaultValue: "block"),
+                    options: [
+                        StylePresetOption(title: "block", value: "block"),
+                        StylePresetOption(title: "flex", value: "flex"),
+                        StylePresetOption(title: "grid", value: "grid"),
+                        StylePresetOption(title: "inline", value: "inline"),
+                        StylePresetOption(title: "none", value: "none")
+                    ]
+                )
+                if model.selectedElement?.style?.display?.contains("flex") == true ||
+                   model.selectedElement?.style?.display?.contains("grid") == true {
+                    styleChoiceRow(
+                        title: "Direction",
+                        value: styleStringBinding(\.flexDirection, defaultValue: "row"),
+                        options: [
+                            StylePresetOption(title: "Row", value: "row"),
+                            StylePresetOption(title: "Column", value: "column"),
+                            StylePresetOption(title: "Reverse Row", value: "row-reverse"),
+                            StylePresetOption(title: "Reverse Column", value: "column-reverse")
+                        ]
+                    )
+                    styleChoiceRow(
+                        title: "Main-Axis Alignment",
+                        value: styleStringBinding(\.justifyContent, defaultValue: "normal"),
+                        options: [
+                            StylePresetOption(title: "Start", value: "flex-start"),
+                            StylePresetOption(title: "Center", value: "center"),
+                            StylePresetOption(title: "End", value: "flex-end"),
+                            StylePresetOption(title: "Space Between", value: "space-between"),
+                            StylePresetOption(title: "Space Around", value: "space-around")
+                        ]
+                    )
+                    styleChoiceRow(
+                        title: "Cross Axis",
+                        value: styleStringBinding(\.alignItems, defaultValue: "normal"),
+                        options: [
+                            StylePresetOption(title: "Start", value: "flex-start"),
+                            StylePresetOption(title: "Center", value: "center"),
+                            StylePresetOption(title: "End", value: "flex-end"),
+                            StylePresetOption(title: "Stretch", value: "stretch"),
+                            StylePresetOption(title: "Baseline", value: "baseline")
+                        ]
+                    )
+                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                        GridRow {
+                            NumberField(label: "Gap", value: styleDoubleBinding(\.gap, defaultValue: 0))
+                        }
+                    }
+                    styleChoiceRow(
+                        title: "Wrapping",
+                        value: styleStringBinding(\.flexWrap, defaultValue: "nowrap"),
+                        options: [
+                            StylePresetOption(title: "No Wrap", value: "nowrap"),
+                            StylePresetOption(title: "Wrap", value: "wrap"),
+                            StylePresetOption(title: "Reverse", value: "wrap-reverse")
+                        ]
+                    )
+                }
+                styleChoiceRow(
+                    title: "Position",
+                    value: styleStringBinding(\.position, defaultValue: "static"),
+                    options: [
+                        StylePresetOption(title: "static", value: "static"),
+                        StylePresetOption(title: "relative", value: "relative"),
+                        StylePresetOption(title: "absolute", value: "absolute"),
+                        StylePresetOption(title: "fixed", value: "fixed"),
+                        StylePresetOption(title: "sticky", value: "sticky")
+                    ]
+                )
+                styleChoiceRow(
+                    title: "Overflow",
+                    value: styleStringBinding(\.overflow, defaultValue: "visible"),
+                    options: [
+                        StylePresetOption(title: "visible", value: "visible"),
+                        StylePresetOption(title: "hidden", value: "hidden"),
+                        StylePresetOption(title: "scroll", value: "scroll"),
+                        StylePresetOption(title: "auto", value: "auto")
+                    ]
+                )
+            }
+        }
+    }
+
+    private var miscStyleGroup: some View {
+        GroupBox("Other Styles") {
+            VStack(alignment: .leading, spacing: 12) {
+                Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                    GridRow {
+                        NumberField(label: "Opacity", value: styleDoubleBinding(\.opacity, defaultValue: 1), fractionLength: 2)
+                        NumberField(label: "Letter Spacing", value: styleDoubleBinding(\.letterSpacing, defaultValue: 0), fractionLength: 2)
+                    }
+                }
+                styleChoiceRow(
+                    title: "Text Decoration",
+                    value: styleStringBinding(\.textDecoration, defaultValue: "none"),
+                    options: [
+                        StylePresetOption(title: "None", value: "none"),
+                        StylePresetOption(title: "Underline", value: "underline"),
+                        StylePresetOption(title: "Strikethrough", value: "line-through"),
+                        StylePresetOption(title: "Overline", value: "overline")
+                    ]
+                )
+                styleChoiceRow(
+                    title: "Letter Case",
+                    value: styleStringBinding(\.textTransform, defaultValue: "none"),
+                    options: [
+                        StylePresetOption(title: "None", value: "none"),
+                        StylePresetOption(title: "Uppercase", value: "uppercase"),
+                        StylePresetOption(title: "Lowercase", value: "lowercase"),
+                        StylePresetOption(title: "Capitalize", value: "capitalize")
+                    ]
+                )
+                styleChoiceRow(
+                    title: "Whitespace",
+                    value: styleStringBinding(\.whiteSpace, defaultValue: "normal"),
+                    options: [
+                        StylePresetOption(title: "normal", value: "normal"),
+                        StylePresetOption(title: "nowrap", value: "nowrap"),
+                        StylePresetOption(title: "pre", value: "pre"),
+                        StylePresetOption(title: "pre-wrap", value: "pre-wrap")
+                    ]
+                )
+            }
+        }
+    }
+
     @ViewBuilder
     private var htmlAssetGroups: some View {
         if model.documentMode == "html" {
@@ -4567,15 +4568,19 @@ private struct InspectorPanel: View {
 
     private var tableGroup: some View {
         GroupBox("Table") {
-            Grid(horizontalSpacing: 8, verticalSpacing: 8) {
-                GridRow {
-                    CommandButton(title: "+Row", icon: "plus.square", command: "tableAddRowAfter")
-                    CommandButton(title: "-Row", icon: "minus.square", command: "tableDeleteRow")
-                }
-                GridRow {
-                    CommandButton(title: "+Col", icon: "plus.rectangle.on.rectangle", command: "tableAddColumnAfter")
-                    CommandButton(title: "-Col", icon: "minus.rectangle", command: "tableDeleteColumn")
-                }
+            tableOperationGrid
+        }
+    }
+
+    private var tableOperationGrid: some View {
+        Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+            GridRow {
+                CommandButton(title: "+ Row", icon: "plus.square", command: "tableAddRowAfter")
+                CommandButton(title: "− Row", icon: "minus.square", command: "tableDeleteRow")
+            }
+            GridRow {
+                CommandButton(title: "+ Column", icon: "plus.rectangle.on.rectangle", command: "tableAddColumnAfter")
+                CommandButton(title: "− Column", icon: "minus.rectangle", command: "tableDeleteColumn")
             }
         }
     }
@@ -4614,17 +4619,21 @@ private struct InspectorPanel: View {
                     options: textAlignmentPresets
                 )
 
-                Grid(horizontalSpacing: 8, verticalSpacing: 8) {
-                    GridRow {
-                        CommandButton(title: "Left", icon: "text.alignleft", command: "cellAlignLeft")
-                        CommandButton(title: "Center", icon: "text.aligncenter", command: "cellAlignCenter")
-                        CommandButton(title: "Right", icon: "text.alignright", command: "cellAlignRight")
-                    }
-                    GridRow {
-                        CommandButton(title: "Header", icon: "tablecells.badge.ellipsis", command: "cellStyleHeader")
-                        CommandButton(title: "Soft", icon: "paintbrush", command: "cellStyleSoft")
-                    }
-                }
+                cellActionGrid
+            }
+        }
+    }
+
+    private var cellActionGrid: some View {
+        Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+            GridRow {
+                CommandButton(title: "Left", icon: "text.alignleft", command: "cellAlignLeft")
+                CommandButton(title: "Center", icon: "text.aligncenter", command: "cellAlignCenter")
+                CommandButton(title: "Right", icon: "text.alignright", command: "cellAlignRight")
+            }
+            GridRow {
+                CommandButton(title: "Header", icon: "tablecells.badge.ellipsis", command: "cellStyleHeader")
+                CommandButton(title: "Soft", icon: "paintbrush", command: "cellStyleSoft")
             }
         }
     }
@@ -5056,11 +5065,44 @@ private struct InspectorPanel: View {
     @ViewBuilder
     private var htmlControlsGroup: some View {
         if model.documentMode == "html" {
+            GroupBox("State Preview") {
+                VStack(alignment: .leading, spacing: 10) {
+                    Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                        GridRow {
+                            pseudoPreviewButton(title: "Normal", icon: "circle", state: "none")
+                            pseudoPreviewButton(title: "Hover", icon: "hand.point.up.left", state: "hover")
+                            pseudoPreviewButton(title: "Focus", icon: "cursorarrow.rays", state: "focus")
+                        }
+                    }
+
+                    Text("The preview affects only the selected object. Use it to check pseudo-class styles for buttons, cards, and forms.")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(MaterialTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             GroupBox("Layout Mode") {
                 Grid(horizontalSpacing: 8, verticalSpacing: 8) {
                     GridRow {
                         CommandButton(title: "Free", icon: "arrow.up.left.and.arrow.down.right", command: "setLayoutFree")
                         CommandButton(title: "Transform", icon: "move.3d", command: "setLayoutTransform")
+                    }
+                }
+            }
+
+            GroupBox("Insert Elements") {
+                Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                    GridRow {
+                        CommandButton(title: "Section", icon: "square.dashed", command: "insertDiv")
+                        CommandButton(title: "Paragraph", icon: "text.alignleft", command: "insertParagraph")
+                    }
+                    GridRow {
+                        CommandButton(title: "Image", icon: "photo", command: "insertImage")
+                        CommandButton(title: "Link", icon: "link", command: "insertLink")
+                    }
+                    GridRow {
+                        CommandButton(title: "Table", icon: "tablecells", command: "insertTable")
                     }
                 }
             }
@@ -5090,6 +5132,18 @@ private struct InspectorPanel: View {
                 .foregroundStyle(MaterialTheme.muted)
                 .materialCard()
         }
+    }
+
+    private func pseudoPreviewButton(title: String, icon: String, state: String) -> some View {
+        let isSelected = htmlPseudoPreviewState == state
+        return Button {
+            htmlPseudoPreviewState = state
+            model.setHTMLPseudoPreviewState(state)
+        } label: {
+            Label(title, systemImage: icon)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(MaterialButtonStyle(filled: isSelected, compact: true))
     }
 
     private var selectedTagName: String {
@@ -5150,6 +5204,78 @@ private struct InspectorPanel: View {
         let original = element.sourceSnippet?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let draft = sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         return !draft.isEmpty && draft != original && validation.severity != .error
+    }
+
+    private func syncStylesheetRuleDraft(for element: EditorElement) {
+        let snippet = element.style?.writebackRuleSnippet ?? ""
+        guard !snippet.isEmpty else {
+            stylesheetRuleDraft = ""
+            stylesheetRuleDraftElementID = nil
+            stylesheetRuleOriginalSnippet = ""
+            stylesheetRuleValidationMessage = nil
+            stylesheetRuleValidationTask?.cancel()
+            return
+        }
+
+        guard stylesheetRuleDraftElementID != element.id else {
+            if stylesheetRuleOriginalSnippet != snippet {
+                stylesheetRuleOriginalSnippet = snippet
+                stylesheetRuleDraft = snippet
+                stylesheetRuleValidationMessage = nil
+            } else if stylesheetRuleDraft.isEmpty {
+                stylesheetRuleDraft = snippet
+            }
+            return
+        }
+
+        stylesheetRuleDraftElementID = element.id
+        stylesheetRuleOriginalSnippet = snippet
+        stylesheetRuleDraft = snippet
+        stylesheetRuleValidationMessage = nil
+        stylesheetRuleValidationTask?.cancel()
+    }
+
+    private func restoreStylesheetRuleDraft(for style: EditorElementStyle) {
+        let snippet = style.writebackRuleSnippet ?? ""
+        stylesheetRuleValidationTask?.cancel()
+        stylesheetRuleDraft = snippet
+        stylesheetRuleOriginalSnippet = snippet
+        stylesheetRuleValidationMessage = nil
+        model.status = "Current CSS rule snippet restored"
+    }
+
+    private func canRestoreStylesheetRuleDraft(for style: EditorElementStyle) -> Bool {
+        let original = (style.writebackRuleSnippet ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = stylesheetRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !original.isEmpty && draft != original
+    }
+
+    private func canApplyStylesheetRuleDraft(for style: EditorElementStyle) -> Bool {
+        let original = (style.writebackRuleSnippet ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = stylesheetRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !draft.isEmpty && draft != original && stylesheetRuleValidationMessage == nil
+    }
+
+    private func scheduleStylesheetRuleValidation(for element: EditorElement) {
+        let original = (element.style?.writebackRuleSnippet ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let draft = stylesheetRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        stylesheetRuleValidationTask?.cancel()
+
+        guard !draft.isEmpty, draft != original else {
+            stylesheetRuleValidationMessage = nil
+            return
+        }
+
+        stylesheetRuleValidationTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard !Task.isCancelled else { return }
+            model.validateSelectedStylesheetRuleDraft(stylesheetRuleDraft) { message in
+                Task { @MainActor in
+                    guard !Task.isCancelled else { return }
+                    stylesheetRuleValidationMessage = message
+                }
+            }
+        }
     }
 
     private func sourceDraftValidation(for element: EditorElement) -> SourceDraftValidation {
@@ -5228,12 +5354,12 @@ private struct InspectorPanel: View {
                 Spacer(minLength: 0)
                 Text("Preserved \(summary.preservedCount) · Added \(summary.addedCount) · Replaced \(summary.unmatchedCount)")
                     .font(.system(size: 8, weight: .heavy, design: .monospaced))
-                    .foregroundStyle(summary.hasStructureRisk ? Color(red: 0.78, green: 0.47, blue: 0.06) : MaterialTheme.muted)
+                    .foregroundStyle(summary.hasStructureRisk ? MaterialTheme.accentWarning : MaterialTheme.muted)
             }
 
             Text(summary.riskSummary)
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(summary.hasStructureRisk ? Color(red: 0.78, green: 0.47, blue: 0.06) : MaterialTheme.muted)
+                .foregroundStyle(summary.hasStructureRisk ? MaterialTheme.accentWarning : MaterialTheme.muted)
                 .fixedSize(horizontal: false, vertical: true)
 
             ForEach(sourceDraftMappingPreviewItems(summary)) { item in
@@ -5323,11 +5449,11 @@ private struct InspectorPanel: View {
     private func sourceDraftMappingColor(for item: SourceDraftMappingItem) -> Color {
         switch item.slot {
         case "preserved":
-            return Color(red: 0.06, green: 0.52, blue: 0.26)
+            return MaterialTheme.accentSuccess
         case "added":
             return MaterialTheme.primary
         default:
-            return Color(red: 0.78, green: 0.47, blue: 0.06)
+            return MaterialTheme.accentWarning
         }
     }
 
@@ -5356,11 +5482,30 @@ private struct InspectorPanel: View {
     }
 
     private var isSelectedImage: Bool {
-        selectedTagName == "img" || model.selectedElement?.type == "image"
+        selectedTagName == "img" || model.selectedElement?.type == "image" || (model.selectedElement?.semanticRole == "image" && model.selectedElement?.imageSource != nil)
+    }
+
+    private func supportsLinkAttributes(_ element: EditorElement) -> Bool {
+        selectedTagName == "a" || element.semanticRole == "link" || element.linkHref != nil || element.linkTarget != nil
+    }
+
+    private func canApplyHTMLAttributeDrafts(for element: EditorElement) -> Bool {
+        let classChanged = classNameDraft.trimmingCharacters(in: .whitespacesAndNewlines) != (element.className ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let styleChanged = inlineStyleDraft.trimmingCharacters(in: .whitespacesAndNewlines) != (element.inlineStyle ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let linkChanged = supportsLinkAttributes(element)
+            && (
+                linkHrefDraft.trimmingCharacters(in: .whitespacesAndNewlines) != (element.linkHref ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                || linkTargetDraft.trimmingCharacters(in: .whitespacesAndNewlines) != (element.linkTarget ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        return classChanged || styleChanged || linkChanged
     }
 
     private var isCellSelection: Bool {
         selectedTagName == "td" || selectedTagName == "th"
+    }
+
+    private var isGeometryLockedSelection: Bool {
+        model.documentMode == "html" && model.selectedElement?.editability == "table-structure"
     }
 
     private var isTableSelection: Bool {
@@ -5373,7 +5518,7 @@ private struct InspectorPanel: View {
     }
 
     private func supportsImageControls(_ element: EditorElement) -> Bool {
-        element.type == "image" || selectedTagName == "img"
+        element.semanticRole != "image-reference" && (element.type == "image" || selectedTagName == "img" || element.imageSource?.isEmpty == false)
     }
 
     private var textAlignmentPresets: [StylePresetOption] {
@@ -5497,6 +5642,16 @@ private struct InspectorPanel: View {
         }
     }
 
+    private func textContentBinding(defaultValue: String) -> Binding<String> {
+        Binding {
+            model.selectedElement?.text ?? defaultValue
+        } set: { value in
+            guard var element = model.selectedElement else { return }
+            element.text = value
+            model.updateElement(element)
+        }
+    }
+
     private func imageSourceBinding(defaultValue: String) -> Binding<String> {
         Binding {
             model.selectedElement?.imageSource ?? defaultValue
@@ -5548,12 +5703,12 @@ private struct InspectorSelectionHeader: View {
                     .font(.caption)
                     .foregroundStyle(MaterialTheme.muted)
 
-                if let path, !path.isEmpty {
-                    Text(path)
+                if let actionHint {
+                    Text(actionHint)
                         .font(.caption2)
-                        .foregroundStyle(MaterialTheme.muted.opacity(0.82))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(MaterialTheme.primaryDark)
                         .lineLimit(2)
-                        .textSelection(.enabled)
                 }
             }
 
@@ -5573,6 +5728,22 @@ private struct InspectorSelectionHeader: View {
 
     private var iconName: String {
         element.chiseloIconName
+    }
+
+    private var actionHint: String? {
+        if element.type == "html-group" || element.type == "deck-group" {
+            return "A group of objects is selected. You can move, align, or distribute the group."
+        }
+        if element.imageSource?.isEmpty == false || element.semanticRole == "image" {
+            return "You can move, resize, replace, or adjust the image."
+        }
+        if element.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            return "You can edit text, move, resize, and adjust the appearance."
+        }
+        if let path, !path.isEmpty {
+            return "The source path is available on the Source tab. This tab contains common edits."
+        }
+        return nil
     }
 }
 
@@ -5594,6 +5765,19 @@ private struct SourceWritebackStatusBadge: View {
                         .foregroundStyle(MaterialTheme.ink)
                     if let target = status.target {
                         Text(target)
+                            .font(.system(size: 9, weight: .heavy, design: .monospaced))
+                            .foregroundStyle(status.color)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+
+                if let sourceLabel = status.sourceLabel {
+                    HStack(spacing: 5) {
+                        Image(systemName: status.sourceKind == "linked-local" ? "externaldrive" : "text.alignleft")
+                            .font(.system(size: 8, weight: .heavy))
+                            .foregroundStyle(status.color)
+                        Text(sourceLabel)
                             .font(.system(size: 9, weight: .heavy, design: .monospaced))
                             .foregroundStyle(status.color)
                             .lineLimit(1)
@@ -5759,8 +5943,8 @@ private struct SourceDraftValidation: Equatable {
 
     var color: Color {
         switch severity {
-        case .ok: return Color(red: 0.06, green: 0.52, blue: 0.26)
-        case .warning: return Color(red: 0.78, green: 0.47, blue: 0.06)
+        case .ok: return MaterialTheme.accentSuccess
+        case .warning: return MaterialTheme.accentWarning
         case .error: return MaterialTheme.accentDanger
         }
     }
@@ -6025,6 +6209,86 @@ private struct LayerStackRow: View, Equatable {
 
 private extension EditorElement {
     typealias EditabilityStatus = (title: String, detail: String, icon: String, color: Color)
+    typealias PrecisionSafetyStatus = (title: String, detail: String, operations: [String], targetId: String?, containerId: String?, icon: String, color: Color)
+
+    var chiseloPrecisionSafetyStatus: PrecisionSafetyStatus? {
+        if let title = editSafetyTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !title.isEmpty {
+            let level = editSafetyLevel?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? "free"
+            let detail = editSafetyDetail?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fallbackDetail: String
+            switch level {
+            case "danger":
+                fallbackDetail = "This object has clipping, bounds, or structure risks. Check the parent bounds before moving it."
+            case "locked":
+                fallbackDetail = "This object is not suitable for direct dragging. Use the related structure tool or select its parent."
+            case "caution", "warning":
+                fallbackDetail = "The layout or parent container affects this object. Review it after editing."
+            default:
+                fallbackDetail = "You can move, resize, edit text, and change styles."
+            }
+
+            return (
+                title,
+                detail?.isEmpty == false ? detail! : fallbackDetail,
+                editSafetyOperations ?? [],
+                editSafetyTargetId,
+                editSafetyContainerId,
+                precisionSafetyIcon(for: level),
+                precisionSafetyColor(for: level)
+            )
+        }
+
+        if let status = chiseloEditabilityStatus {
+            return (
+                status.title,
+                status.detail,
+                [],
+                id,
+                nil,
+                status.icon,
+                status.color
+            )
+        }
+
+        return nil
+    }
+
+    var chiseloGeometrySafetyNotice: PrecisionSafetyStatus? {
+        let level = editSafetyLevel?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard level == "danger" || level == "locked" || level == "caution" || level == "warning" else {
+            return nil
+        }
+        return chiseloPrecisionSafetyStatus
+    }
+
+    private func precisionSafetyIcon(for level: String) -> String {
+        switch level {
+        case "danger":
+            return "exclamationmark.triangle.fill"
+        case "locked":
+            return "lock.fill"
+        case "caution", "warning":
+            return "hand.raised.fill"
+        case "free":
+            return "checkmark.seal.fill"
+        default:
+            return "viewfinder"
+        }
+    }
+
+    private func precisionSafetyColor(for level: String) -> Color {
+        switch level {
+        case "danger", "locked":
+            return MaterialTheme.accentDanger
+        case "caution", "warning":
+            return MaterialTheme.accentWarning
+        case "free":
+            return MaterialTheme.accentSuccess
+        default:
+            return MaterialTheme.primary
+        }
+    }
 
     var chiseloEditabilityStatus: EditabilityStatus? {
         guard editability != nil || fidelity != nil || captureNote != nil else { return nil }
@@ -6032,16 +6296,20 @@ private extension EditorElement {
         let note = captureNote?.trimmingCharacters(in: .whitespacesAndNewlines)
         switch editability ?? "" {
         case "text-editable":
-            return ("Editable text", note?.isEmpty == false ? note! : "Text can be edited directly while keeping its font, color, and position.", "textformat", Color(red: 0.06, green: 0.52, blue: 0.26))
+            return ("Editable Text", note?.isEmpty == false ? note! : "Text can be edited directly while its current font, color, and position remain unchanged.", "textformat", MaterialTheme.accentSuccess)
         case "replaceable":
-            return ("Replaceable image", note?.isEmpty == false ? note! : "The image stays a separate object you can replace and adjust.", "photo", Color(red: 0.06, green: 0.52, blue: 0.26))
+            return ("Replaceable Image", note?.isEmpty == false ? note! : "The image remains a separate object that you can replace and adjust.", "photo", MaterialTheme.accentSuccess)
+        case "reference":
+            return ("Image Reference", note?.isEmpty == false ? note! : "This is an HTML image reference or placeholder, not a replaceable image node.", "photo", MaterialTheme.accentWarning)
+        case "table-structure":
+            return ("Table-Internal Object", note?.isEmpty == false ? note! : "You can edit text and styles or use row, column, and cell operations. Select the whole table before moving it.", "tablecells", MaterialTheme.accentDanger)
         case "style-editable":
             return ("Adjustable style object", note?.isEmpty == false ? note! : "The shape, background, or border became an adjustable object.", "square.on.square", MaterialTheme.primary)
         case "whole-object":
-            return ("Whole-object fidelity", note?.isEmpty == false ? note! : "This region cannot be split reliably, so it is kept as one whole object.", "rectangle.dashed", Color(red: 0.78, green: 0.47, blue: 0.06))
+            return ("Whole Fidelity Object", note?.isEmpty == false ? note! : "This region cannot be separated reliably. It remains as a whole object.", "rectangle.dashed", MaterialTheme.accentWarning)
         default:
             if fidelity == "approximated" {
-                return ("Approximated", note?.isEmpty == false ? note! : "A complex visual effect became an editable approximated object.", "wand.and.rays", Color(red: 0.78, green: 0.47, blue: 0.06))
+                return ("Approximate Reconstruction", note?.isEmpty == false ? note! : "The complex visual effect was converted to an editable approximation.", "wand.and.rays", MaterialTheme.accentWarning)
             }
             return ("Captured object", note?.isEmpty == false ? note! : "Captured from the current rendered page.", "viewfinder", MaterialTheme.primary)
         }
@@ -6074,6 +6342,10 @@ private extension EditorElement {
     var chiseloTypeLabel: String {
         if let semanticLabel, !semanticLabel.isEmpty {
             return semanticLabel
+        }
+
+        if semanticRole == "image-reference" {
+            return "Image Reference"
         }
 
         if type == "deck-group" { return "Module Group" }
@@ -6112,7 +6384,7 @@ private extension EditorElement {
         switch semanticRole ?? "" {
         case "heading", "paragraph", "text", "list-item", "caption":
             return "textformat"
-        case "image", "figure":
+        case "image", "image-reference", "figure":
             return "photo"
         case "table", "table-section", "table-row", "table-cell", "table-header-cell", "table-like":
             return "tablecells"
@@ -6155,6 +6427,10 @@ private extension HTMLTreeNode {
             return semanticLabel
         }
 
+        if semanticRole == "image-reference" {
+            return "Image Reference"
+        }
+
         switch tagName.lowercased() {
         case "img":
             return "Image"
@@ -6181,7 +6457,7 @@ private extension HTMLTreeNode {
         switch semanticRole ?? "" {
         case "heading", "paragraph", "text", "list-item", "caption":
             return "textformat"
-        case "image", "figure":
+        case "image", "image-reference", "figure":
             return "photo"
         case "table", "table-section", "table-row", "table-cell", "table-header-cell", "table-like":
             return "tablecells"
@@ -6470,7 +6746,18 @@ private struct StyleTextField: View {
 }
 
 private extension EditorElementStyle {
-    typealias WritebackStatus = (title: String, detail: String, target: String?, icon: String, color: Color)
+    typealias WritebackStatus = (
+        title: String,
+        detail: String,
+        target: String?,
+        sourceLabel: String?,
+        sourceKind: String?,
+        sourceURL: String?,
+        ruleSnippet: String?,
+        ruleLine: Int?,
+        icon: String,
+        color: Color
+    )
 
     var writebackStatus: WritebackStatus? {
         guard let kind = writebackKind?.trimmingCharacters(in: .whitespacesAndNewlines), !kind.isEmpty else {
@@ -6480,6 +6767,14 @@ private extension EditorElementStyle {
         let target = writebackTarget?.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedTarget = target?.isEmpty == false ? target : nil
         let detail = writebackDetail?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sourceLabel = writebackSourceLabel?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedSourceLabel = sourceLabel?.isEmpty == false ? sourceLabel : nil
+        let sourceKind = writebackSourceKind?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sourceURL = writebackSourceURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedSourceURL = sourceURL?.isEmpty == false ? sourceURL : nil
+        let ruleSnippet = writebackRuleSnippet?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedRuleSnippet = ruleSnippet?.isEmpty == false ? ruleSnippet : nil
+        let ruleLine = writebackRuleLine
 
         if kind == "stylesheet-rule" {
             let selector = normalizedTarget ?? "a CSS rule"
@@ -6487,8 +6782,13 @@ private extension EditorElementStyle {
                 "Writes back to CSS rule",
                 detail?.isEmpty == false ? detail! : "Safe style changes are written back to \(selector) first.",
                 selector,
+                normalizedSourceLabel,
+                sourceKind,
+                normalizedSourceURL,
+                normalizedRuleSnippet,
+                ruleLine,
                 "curlybraces",
-                Color(red: 0.06, green: 0.52, blue: 0.26)
+                MaterialTheme.accentSuccess
             )
         }
 
@@ -6497,8 +6797,13 @@ private extension EditorElementStyle {
                 "Writes to object style",
                 detail?.isEmpty == false ? detail! : "Style changes are written to this object's inline style.",
                 normalizedTarget,
+                normalizedSourceLabel,
+                sourceKind,
+                normalizedSourceURL,
+                normalizedRuleSnippet,
+                ruleLine,
                 "paintbrush.pointed",
-                Color(red: 0.78, green: 0.47, blue: 0.06)
+                MaterialTheme.accentWarning
             )
         }
 
@@ -6522,7 +6827,12 @@ private extension EditorElementStyle {
             writebackKind: nil,
             writebackLabel: nil,
             writebackTarget: nil,
-            writebackDetail: nil
+            writebackDetail: nil,
+            writebackSourceKind: nil,
+            writebackSourceLabel: nil,
+            writebackSourceURL: nil,
+            writebackRuleSnippet: nil,
+            writebackRuleLine: nil
         )
     }
 }
@@ -6637,23 +6947,23 @@ private struct MaterialDivider: View {
 private struct MaterialSidebarBackground: View {
     var body: some View {
         RoundedRectangle(cornerRadius: MaterialTheme.radiusPanel)
-            .fill(.thinMaterial)
+            .fill(.ultraThinMaterial)
             .background(
                 RoundedRectangle(cornerRadius: MaterialTheme.radiusPanel)
-                    .fill(MaterialTheme.surfaceStrong.opacity(0.54))
+                    .fill(MaterialTheme.surfaceChrome)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: MaterialTheme.radiusPanel)
-                    .stroke(MaterialTheme.hairline.opacity(0.86), lineWidth: 1)
+                    .stroke(MaterialTheme.hairline.opacity(0.78), lineWidth: 1)
             )
-            .shadow(color: MaterialTheme.shadow.opacity(0.07), radius: 12, x: 0, y: 4)
+            .shadow(color: MaterialTheme.shadow.opacity(0.055), radius: 14, x: 0, y: 4)
     }
 }
 
 private struct MaterialInputBackground: View {
     var body: some View {
         RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
-            .fill(MaterialTheme.surfaceStrong)
+            .fill(MaterialTheme.surfaceFloating)
             .overlay(
                 RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
                     .stroke(MaterialTheme.separator.opacity(0.82), lineWidth: 1)
@@ -6675,7 +6985,7 @@ private struct MaterialGroupBoxStyle: GroupBoxStyle {
     }
 }
 
-private struct MaterialButtonStyle: ButtonStyle {
+struct MaterialButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     var filled: Bool = false
@@ -6693,8 +7003,8 @@ private struct MaterialButtonStyle: ButtonStyle {
                 RoundedRectangle(cornerRadius: MaterialTheme.radiusSmall)
                     .fill(backgroundColor)
                     .shadow(
-                        color: MaterialTheme.shadow.opacity(isEnabled ? (configuration.isPressed ? 0.10 : 0.18) : 0.04),
-                        radius: isEnabled ? (configuration.isPressed ? 2 : 7) : 2,
+                        color: MaterialTheme.shadow.opacity(shadowOpacity(isPressed: configuration.isPressed)),
+                        radius: isEnabled ? (configuration.isPressed ? 2 : 6) : 0,
                         x: 0,
                         y: isEnabled ? (configuration.isPressed ? 1 : 2) : 1
                     )
@@ -6716,9 +7026,17 @@ private struct MaterialButtonStyle: ButtonStyle {
 
     private var backgroundColor: Color {
         if !isEnabled {
-            return MaterialTheme.surface.opacity(0.72)
+            return MaterialTheme.surfaceChrome.opacity(0.72)
         }
-        return filled ? MaterialTheme.primary : MaterialTheme.surface
+        return filled ? MaterialTheme.primary : MaterialTheme.surfaceFloating
+    }
+
+    private func shadowOpacity(isPressed: Bool) -> Double {
+        guard isEnabled else { return 0 }
+        if filled {
+            return isPressed ? 0.10 : 0.16
+        }
+        return isPressed ? 0.04 : 0.08
     }
 }
 
@@ -6729,11 +7047,15 @@ private struct MaterialCardModifier: ViewModifier {
             .background(
                 RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
                     .fill(.regularMaterial)
-                    .shadow(color: MaterialTheme.shadow.opacity(0.14), radius: 12, x: 0, y: 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
+                            .fill(MaterialTheme.surfaceFloating)
+                    )
+                    .shadow(color: MaterialTheme.shadow.opacity(0.08), radius: 12, x: 0, y: 4)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: MaterialTheme.radiusMedium)
-                    .stroke(MaterialTheme.hairline, lineWidth: 1)
+                    .stroke(MaterialTheme.hairline.opacity(0.82), lineWidth: 1)
             )
     }
 }

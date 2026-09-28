@@ -3,18 +3,6 @@ import Foundation
 import UniformTypeIdentifiers
 import WebKit
 
-private struct OpenTabPayload: Sendable {
-    let title: String
-    let url: URL
-    let mode: String
-    let content: String
-}
-
-private enum OpenTabReadResult: Sendable {
-    case success(OpenTabPayload)
-    case failure(filename: String, message: String)
-}
-
 private struct OpenTabSafetyInfo: Equatable {
     var backupURL: URL?
     var backupCreated: Bool
@@ -28,43 +16,97 @@ private enum SaveReviewDecision {
     case cancel
 }
 
-struct HTMLVisualSnapshotPair: Equatable {
-    var baseline: NSImage?
-    var current: NSImage?
-    var diff: HTMLVisualSnapshotDiff?
-    var capturedAt: Date?
-
-    var hasImages: Bool {
-        baseline != nil || current != nil
-    }
-
-    static let empty = HTMLVisualSnapshotPair(baseline: nil, current: nil, diff: nil, capturedAt: nil)
-}
-
-struct HTMLVisualSnapshotDiff: Equatable {
-    var changedPixelRatio: Double
-    var averageDelta: Double
-    var maxDelta: Double
-    var sampleWidth: Int
-    var sampleHeight: Int
-    var heatmap: NSImage?
-
-    var hasMeaningfulChange: Bool {
-        changedPixelRatio >= 0.001 || averageDelta >= 0.01
-    }
-
-    static func == (lhs: HTMLVisualSnapshotDiff, rhs: HTMLVisualSnapshotDiff) -> Bool {
-        lhs.changedPixelRatio == rhs.changedPixelRatio
-            && lhs.averageDelta == rhs.averageDelta
-            && lhs.maxDelta == rhs.maxDelta
-            && lhs.sampleWidth == rhs.sampleWidth
-            && lhs.sampleHeight == rhs.sampleHeight
-            && lhs.heatmap?.size == rhs.heatmap?.size
-    }
-}
-
 @MainActor
 final class EditorModel: ObservableObject {
+    private struct DocumentOperationContext {
+        let token: UUID
+        let tabID: UUID
+        let url: URL?
+        let runtimeMode: HTMLRuntimeMode
+        let title: String
+    }
+
+    private enum DocumentOperationError: LocalizedError {
+        case webViewUnavailable
+        case noHTMLReturned
+        case invalidSavePayload
+        case documentChanged
+
+        var errorDescription: String? {
+            switch self {
+            case .webViewUnavailable:
+                return "The editor is not ready"
+            case .noHTMLReturned:
+                return "The editor did not return HTML"
+            case .invalidSavePayload:
+                return "The editor returned invalid save data"
+            case .documentChanged:
+                return "The document changed during the operation"
+            }
+        }
+    }
+
+    enum WorkspaceMode: String, CaseIterable, Identifiable {
+        case ordinary
+        case advanced
+
+        var id: String { rawValue }
+        var title: String { self == .ordinary ? "Standard" : "Advanced" }
+        var iconName: String { self == .ordinary ? "wand.and.stars" : "slider.horizontal.3" }
+        var detail: String {
+            self == .ordinary
+                ? "Show common tools for text, images, appearance, and position."
+                : "Show DOM structure, source, layers, dynamic runtime, and professional export tools."
+        }
+    }
+
+    enum HTMLPreviewDevice: String, CaseIterable, Identifiable {
+        case original
+        case desktop
+        case tablet
+        case mobile
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .original: return "Original"
+            case .desktop: return "Desktop"
+            case .tablet: return "Tablet"
+            case .mobile: return "Phone"
+            }
+        }
+        var iconName: String {
+            switch self {
+            case .original: return "arrow.up.left.and.arrow.down.right"
+            case .desktop: return "desktopcomputer"
+            case .tablet: return "ipad"
+            case .mobile: return "iphone"
+            }
+        }
+        var viewportWidth: Int? {
+            switch self {
+            case .original: return nil
+            case .desktop: return 1440
+            case .tablet: return 768
+            case .mobile: return 390
+            }
+        }
+    }
+
+    enum HTMLRuntimeMode: String, CaseIterable, Identifiable {
+        case safe
+        case live
+
+        var id: String { rawValue }
+        var title: String { self == .safe ? "Static Safe" : "Dynamic Compatibility" }
+        var iconName: String { self == .safe ? "shield.checkered" : "bolt.horizontal.circle" }
+        var detail: String {
+            self == .safe
+                ? "Block page scripts, forms, and remote network resources. Use this mode for standard HTML editing."
+                : "Run page scripts, forms, and remote resources. Use this mode only for trusted dynamic HTML."
+        }
+    }
+
     enum EditorBackdrop: String, CaseIterable, Identifiable {
         case clean
         case grid
@@ -95,7 +137,11 @@ final class EditorModel: ObservableObject {
         var url: URL?
         var mode: String
         var content: String
+        var originalContent: String = ""
+        var localStylesheets: [HTMLLocalStylesheetSavePayload] = []
+        var runtimeMode: HTMLRuntimeMode = .safe
         var needsSnapshot: Bool
+        var hasUnsavedChanges: Bool = false
     }
 
     struct DocumentStats: Equatable {
@@ -118,6 +164,8 @@ final class EditorModel: ObservableObject {
     @Published var activeTabID: UUID?
     @Published var isFileDropTargeted: Bool = false
     @Published var editorBackdrop: EditorBackdrop = .clean
+    @Published var workspaceMode: WorkspaceMode = .ordinary
+    @Published var htmlPreviewDevice: HTMLPreviewDevice = .original
     @Published var documentStats: DocumentStats = .empty
     @Published var htmlDiagnostics: HTMLDiagnostics = .empty
     @Published var htmlVisualSnapshotPair: HTMLVisualSnapshotPair = .empty
@@ -133,9 +181,19 @@ final class EditorModel: ObservableObject {
     @Published var nextUndoLabel: String?
     @Published var nextRedoLabel: String?
     @Published var sourceDraftMappingSummary: SourceDraftMappingSummary?
+    @Published private(set) var isDocumentOperationInProgress: Bool = false
 
     var hasOpenDocument: Bool {
         activeTabID != nil && !tabs.isEmpty
+    }
+
+    var hasUnsavedDocuments: Bool {
+        tabs.contains(where: \.hasUnsavedChanges)
+    }
+
+    var activeHTMLRuntimeMode: HTMLRuntimeMode {
+        guard let index = activeTabIndex else { return .safe }
+        return tabs[index].runtimeMode
     }
 
     var currentSlideElements: [EditorElement] {
@@ -172,10 +230,12 @@ final class EditorModel: ObservableObject {
     private var activeRenderExporter: HTMLRenderExporter?
     private var isSwitchingTabs = false
     private let editorBackdropDefaultsKey = "Chiselo.EditorBackdrop"
+    private let workspaceModeDefaultsKey = "Chiselo.WorkspaceMode"
     private var htmlVisualBaselineImage: NSImage?
     private var pendingHTMLVisualBaselineCapture = false
     private var tabSafetyInfo: [UUID: OpenTabSafetyInfo] = [:]
     private var sourceDraftValidationRequestID: Int = 0
+    private var activeDocumentOperationToken: UUID?
 
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -187,6 +247,10 @@ final class EditorModel: ObservableObject {
         if let rawValue = UserDefaults.standard.string(forKey: editorBackdropDefaultsKey),
            let backdrop = EditorBackdrop(rawValue: rawValue) {
             editorBackdrop = backdrop
+        }
+        if let rawValue = UserDefaults.standard.string(forKey: workspaceModeDefaultsKey),
+           let mode = WorkspaceMode(rawValue: rawValue) {
+            workspaceMode = mode
         }
     }
 
@@ -666,7 +730,7 @@ final class EditorModel: ObservableObject {
                     updatePublished(\.selectionPath, to: nil)
                     return
                 }
-                let message = bridgeSelectionMessage(from: body)
+                let message = EditorBridgeDecoder.selectionMessage(from: body)
                 updatePublished(\.selectedSlideIndex, to: message.slideIndex ?? selectedSlideIndex)
                 updatePublished(\.selectedElement, to: message.element)
                 updatePublished(\.selectionPath, to: message.path)
@@ -709,7 +773,9 @@ final class EditorModel: ObservableObject {
                 let data = try JSONSerialization.data(withJSONObject: body, options: [])
                 let message = try JSONDecoder().decode(BridgeHTMLTreeMessage.self, from: data)
                 updatePublished(\.htmlTree, to: message.tree)
-                updatePublished(\.htmlDiagnostics, to: message.diagnostics ?? .empty)
+                if let diagnostics = message.diagnostics {
+                    updatePublished(\.htmlDiagnostics, to: diagnostics)
+                }
                 refreshDocumentStats()
                 capturePendingHTMLVisualBaselineIfNeeded()
 
@@ -737,8 +803,11 @@ final class EditorModel: ObservableObject {
                 updatePublished(\.nextRedoLabel, to: normalizedHistoryLabel(message.nextRedoLabel))
 
             case "documentDirty":
-                markActiveTabNeedsSnapshot()
+                markActiveTabDirty()
                 presentBackupReminderBeforeFirstEditIfNeeded()
+
+            case "documentClean":
+                markActiveTabCleanAfterUndo()
 
             case "requestReplaceImage":
                 replaceSelectedImage()
@@ -751,234 +820,64 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    private func bridgeSelectionMessage(from body: [String: Any]) -> BridgeSelectionMessage {
-        BridgeSelectionMessage(
-            type: "selectionChanged",
-            slideIndex: bridgeInt(body["slideIndex"]),
-            path: bridgeString(body["path"]),
-            element: bridgeElement(body["element"])
-        )
-    }
-
-    private func bridgeElement(_ value: Any?) -> EditorElement? {
-        guard let object = value as? [String: Any],
-              let id = bridgeString(object["id"]),
-              let type = bridgeString(object["type"]),
-              let x = bridgeDouble(object["x"]),
-              let y = bridgeDouble(object["y"]),
-              let w = bridgeDouble(object["w"]),
-              let h = bridgeDouble(object["h"]),
-              let rotation = bridgeDouble(object["rotation"]),
-              let z = bridgeDouble(object["z"]) else {
-            return nil
-        }
-
-        return EditorElement(
-            id: id,
-            type: type,
-            tagName: bridgeString(object["tagName"]),
-            htmlPath: bridgeString(object["htmlPath"]),
-            semanticRole: bridgeString(object["semanticRole"]),
-            semanticLabel: bridgeString(object["semanticLabel"]),
-            groupId: bridgeString(object["groupId"]),
-            groupRole: bridgeString(object["groupRole"]),
-            groupLabel: bridgeString(object["groupLabel"]),
-            sourceKind: bridgeString(object["sourceKind"]),
-            sourceSnippet: bridgeString(object["sourceSnippet"]),
-            sourceSnippetLineCount: bridgeInt(object["sourceSnippetLineCount"]),
-            sourceAncestorItems: bridgeSourceNodeItems(object["sourceAncestorItems"]),
-            sourceSiblingItems: bridgeSourceNodeItems(object["sourceSiblingItems"]),
-            sourceChildItems: bridgeSourceNodeItems(object["sourceChildItems"]),
-            editability: bridgeString(object["editability"]),
-            fidelity: bridgeString(object["fidelity"]),
-            captureNote: bridgeString(object["captureNote"]),
-            layoutMode: bridgeString(object["layoutMode"]),
-            imageSource: bridgeString(object["imageSource"]),
-            imageAlt: bridgeString(object["imageAlt"]),
-            frame: bridgeElementFrame(object["frame"]),
-            x: x,
-            y: y,
-            w: w,
-            h: h,
-            rotation: rotation,
-            z: z,
-            locked: bridgeBool(object["locked"]),
-            text: bridgeString(object["text"]),
-            style: bridgeStyle(object["style"])
-        )
-    }
-
-    private func bridgeSourceNodeItems(_ value: Any?) -> [EditorSourceNodeItem]? {
-        guard let values = value as? [[String: Any]] else { return nil }
-        let items = values.compactMap { object -> EditorSourceNodeItem? in
-            guard let id = bridgeString(object["id"]),
-                  let tagName = bridgeString(object["tagName"]),
-                  let label = bridgeString(object["label"]),
-                  let path = bridgeString(object["path"]) else {
-                return nil
-            }
-
-            return EditorSourceNodeItem(
-                id: id,
-                tagName: tagName,
-                label: label,
-                path: path,
-                canEditText: bridgeBool(object["canEditText"]),
-                textPreview: bridgeString(object["textPreview"]),
-                depth: bridgeInt(object["depth"])
-            )
-        }
-
-        return items.isEmpty ? nil : items
-    }
-
-    private func bridgeSourceDraftMappingSummary(_ value: Any?) -> SourceDraftMappingSummary? {
-        guard let object = value as? [String: Any],
-              let preservedCount = bridgeInt(object["preservedCount"]),
-              let addedCount = bridgeInt(object["addedCount"]),
-              let unmatchedCount = bridgeInt(object["unmatchedCount"]),
-              let values = object["items"] as? [[String: Any]] else {
-            return nil
-        }
-
-        let items = values.compactMap { object -> SourceDraftMappingItem? in
-            guard let slot = bridgeString(object["slot"]),
-                  let kind = bridgeString(object["kind"]),
-                  let nextTagName = bridgeString(object["nextTagName"]),
-                  let nextLabel = bridgeString(object["nextLabel"]) else {
-                return nil
-            }
-
-            return SourceDraftMappingItem(
-                slot: slot,
-                kind: kind,
-                previousID: bridgeString(object["previousID"]),
-                previousTagName: bridgeString(object["previousTagName"]),
-                previousLabel: bridgeString(object["previousLabel"]),
-                nextTagName: nextTagName,
-                nextLabel: nextLabel,
-                score: bridgeInt(object["score"])
-            )
-        }
-
-        return SourceDraftMappingSummary(
-            preservedCount: preservedCount,
-            addedCount: addedCount,
-            unmatchedCount: unmatchedCount,
-            structureRisk: bridgeBool(object["structureRisk"]),
-            items: items
-        )
-    }
-
-    private func bridgeElementFrame(_ value: Any?) -> EditorElementFrame? {
-        guard let object = value as? [String: Any],
-              let x = bridgeDouble(object["x"]),
-              let y = bridgeDouble(object["y"]),
-              let w = bridgeDouble(object["w"]),
-              let h = bridgeDouble(object["h"]) else {
-            return nil
-        }
-
-        return EditorElementFrame(
-            label: bridgeString(object["label"]),
-            x: x,
-            y: y,
-            w: w,
-            h: h
-        )
-    }
-
-    private func bridgeStyle(_ value: Any?) -> EditorElementStyle? {
-        guard let object = value as? [String: Any] else { return nil }
-
-        return EditorElementStyle(
-            fontFamily: bridgeString(object["fontFamily"]),
-            fontSize: bridgeDouble(object["fontSize"]),
-            fontWeight: bridgeDouble(object["fontWeight"]),
-            lineHeight: bridgeDouble(object["lineHeight"]),
-            color: bridgeString(object["color"]),
-            fill: bridgeString(object["fill"]),
-            stroke: bridgeString(object["stroke"]),
-            strokeWidth: bridgeDouble(object["strokeWidth"]),
-            radius: bridgeDouble(object["radius"]),
-            shadow: bridgeString(object["shadow"]),
-            textAlign: bridgeString(object["textAlign"]),
-            objectFit: bridgeString(object["objectFit"]),
-            writebackKind: bridgeString(object["writebackKind"]),
-            writebackLabel: bridgeString(object["writebackLabel"]),
-            writebackTarget: bridgeString(object["writebackTarget"]),
-            writebackDetail: bridgeString(object["writebackDetail"])
-        )
-    }
-
-    private func bridgeString(_ value: Any?) -> String? {
-        switch value {
-        case let string as String:
-            return string
-        case let number as NSNumber:
-            return number.stringValue
-        default:
-            return nil
-        }
-    }
-
-    private func bridgeDouble(_ value: Any?) -> Double? {
-        switch value {
-        case let double as Double:
-            return double.isFinite ? double : nil
-        case let number as NSNumber:
-            let double = number.doubleValue
-            return double.isFinite ? double : nil
-        case let string as String:
-            let double = Double(string)
-            return double?.isFinite == true ? double : nil
-        default:
-            return nil
-        }
-    }
-
-    private func bridgeCGFloat(_ value: Any?) -> CGFloat? {
-        guard let value = bridgeDouble(value) else { return nil }
-        return CGFloat(value)
-    }
-
-    private func bridgeInt(_ value: Any?) -> Int? {
-        switch value {
-        case let int as Int:
-            return int
-        case let number as NSNumber:
-            return number.intValue
-        case let string as String:
-            return Int(string)
-        default:
-            return nil
-        }
-    }
-
-    private func bridgeBool(_ value: Any?) -> Bool? {
-        switch value {
-        case let bool as Bool:
-            return bool
-        case let number as NSNumber:
-            return number.boolValue
-        case let string as String:
-            switch string.lowercased() {
-            case "true", "1": return true
-            case "false", "0": return false
-            default: return nil
-            }
-        default:
-            return nil
-        }
-    }
-
     func setEditorBackdrop(_ backdrop: EditorBackdrop) {
         editorBackdrop = backdrop
         UserDefaults.standard.set(backdrop.rawValue, forKey: editorBackdropDefaultsKey)
         applyEditorBackdrop()
     }
 
+    func setWorkspaceMode(_ mode: WorkspaceMode) {
+        workspaceMode = mode
+        UserDefaults.standard.set(mode.rawValue, forKey: workspaceModeDefaultsKey)
+        status = mode == .ordinary ? "Standard mode enabled" : "Advanced editing tools shown"
+    }
+
+    func setHTMLPreviewDevice(_ device: HTMLPreviewDevice) {
+        htmlPreviewDevice = device
+        guard documentMode == "html" else { return }
+        let width = device.viewportWidth.map(String.init) ?? "null"
+        runJavaScript("window.ChiseloEditor?.setHTMLPreviewWidth?.(\(width));")
+        status = device.viewportWidth.map { "Checking the \(device.title.lowercased()) layout at \($0)px" } ?? "Original HTML width restored"
+    }
+
+    func setHTMLZoomPreset(_ preset: String) {
+        guard documentMode == "html" else { return }
+        guard let literal = jsStringLiteral(preset) else { return }
+        runJavaScript("window.ChiseloEditor?.setHTMLZoomPreset?.(\(literal));")
+        status = preset == "fit-width" ? "The page now fits the editor width" : "The 100% view was restored"
+    }
+
+    func setActiveHTMLRuntimeMode(_ mode: HTMLRuntimeMode) {
+        guard documentMode == "html", let activeTabID, let index = activeTabIndex else { return }
+        guard tabs[index].runtimeMode != mode else { return }
+
+        if mode == .live {
+            let alert = NSAlert()
+            alert.messageText = "Allow Scripts in This HTML?"
+            alert.informativeText = "Dynamic compatibility mode runs the page's JavaScript and forms and loads remote resources. Enable it only for trusted HTML. Keep standard HTML in static-safe mode."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Enable Dynamic Compatibility")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else {
+                status = "Static-safe mode kept"
+                return
+            }
+        }
+
+        captureActiveTabSnapshot { [weak self] in
+            guard let self, let currentIndex = self.tabs.firstIndex(where: { $0.id == activeTabID }) else { return }
+            self.tabs[currentIndex].runtimeMode = mode
+            self.loadTab(id: activeTabID)
+            self.status = mode == .safe ? "Static-safe mode enabled" : "Dynamic compatibility enabled"
+        }
+    }
+
     func openDeck() {
+        guard !isDocumentOperationInProgress else {
+            status = "Wait for the current save, export, or conversion to finish"
+            return
+        }
+
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
@@ -989,6 +888,10 @@ final class EditorModel: ObservableObject {
     }
 
     func activateTab(_ id: UUID) {
+        guard !isDocumentOperationInProgress else {
+            status = "You can switch tabs after the current document operation finishes"
+            return
+        }
         guard activeTabID != id, tabs.contains(where: { $0.id == id }) else { return }
         captureActiveTabSnapshot { [weak self] in
             self?.loadTab(id: id)
@@ -996,6 +899,31 @@ final class EditorModel: ObservableObject {
     }
 
     func closeTab(_ id: UUID) {
+        requestCloseTab(id)
+    }
+
+    func requestCloseTab(_ id: UUID) {
+        guard !isDocumentOperationInProgress else {
+            status = "You can close the tab after the current document operation finishes"
+            return
+        }
+        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+        guard tabs[index].hasUnsavedChanges else {
+            closeTabImmediately(id)
+            return
+        }
+
+        let finish: () -> Void = { [weak self] in
+            self?.presentCloseConfirmation(for: id)
+        }
+        if activeTabID == id {
+            captureActiveTabSnapshot(completion: finish)
+        } else {
+            finish()
+        }
+    }
+
+    private func closeTabImmediately(_ id: UUID) {
         guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
         let wasActive = activeTabID == id
         tabSafetyInfo.removeValue(forKey: id)
@@ -1012,7 +940,85 @@ final class EditorModel: ObservableObject {
         loadTab(id: tabs[nextIndex].id)
     }
 
+    private func presentCloseConfirmation(for id: UUID) {
+        guard let index = tabs.firstIndex(where: { $0.id == id }), tabs[index].hasUnsavedChanges else {
+            closeTabImmediately(id)
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "Save Changes to “\(tabs[index].title)”?"
+        alert.informativeText = "Unsaved changes will be lost when you close the tab."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Don't Save")
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            if saveTabSnapshot(id: id) {
+                closeTabImmediately(id)
+            }
+        case .alertThirdButtonReturn:
+            closeTabImmediately(id)
+        default:
+            status = "Close canceled"
+        }
+    }
+
+    func prepareForApplicationTermination(completion: @escaping (Bool) -> Void) {
+        captureActiveTabSnapshot(force: true) { [weak self] snapshotSucceeded in
+            Task { @MainActor in
+                guard let self else {
+                    completion(true)
+                    return
+                }
+                guard snapshotSucceeded else {
+                    self.status = "The current document could not be read. Quit was canceled to protect unsaved changes."
+                    completion(false)
+                    return
+                }
+
+                let unsavedIDs = self.tabs.filter(\.hasUnsavedChanges).map(\.id)
+                guard !unsavedIDs.isEmpty else {
+                    completion(true)
+                    return
+                }
+
+                let alert = NSAlert()
+                alert.messageText = unsavedIDs.count == 1
+                    ? "Save Changes Before Quitting?"
+                    : "Save \(unsavedIDs.count) Modified Documents Before Quitting?"
+                alert.informativeText = "Changes not written to files will be lost if you quit without saving."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Save All and Quit")
+                alert.addButton(withTitle: "Cancel")
+                alert.addButton(withTitle: "Quit Without Saving")
+
+                switch alert.runModal() {
+                case .alertFirstButtonReturn:
+                    for id in unsavedIDs where !self.saveTabSnapshot(id: id) {
+                        completion(false)
+                        return
+                    }
+                    completion(true)
+                case .alertThirdButtonReturn:
+                    completion(true)
+                default:
+                    self.status = "Quit canceled"
+                    completion(false)
+                }
+            }
+        }
+    }
+
     func openDroppedURLs(_ urls: [URL]) {
+        guard !isDocumentOperationInProgress else {
+            status = "You can open another file after the current document operation finishes"
+            isFileDropTargeted = false
+            return
+        }
+
         let openableURLs = urls.filter(canOpenURL)
         guard !openableURLs.isEmpty else {
             status = "Drop in an HTML, HTM, XHTML, or Chiselo project file to open it"
@@ -1149,6 +1155,63 @@ final class EditorModel: ObservableObject {
         }
     }
 
+    @discardableResult
+    private func saveTabSnapshot(id: UUID) -> Bool {
+        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return false }
+        let tab = tabs[index]
+
+        if tab.mode == "html" {
+            guard let url = tab.url ?? chooseSaveURL(defaultName: "document.html", contentTypes: [.html]) else {
+                status = "Save canceled"
+                return false
+            }
+
+            do {
+                let payload = HTMLDocumentSavePayload(html: tab.content, localStylesheets: tab.localStylesheets)
+                let persistence = try persistHTMLDocumentSavePayload(payload, to: url, safeFileHistory: safeFileHistory)
+                tabs[index].url = url
+                tabs[index].title = tabTitle(for: url)
+                tabs[index].originalContent = tab.content
+                tabs[index].localStylesheets = []
+                tabs[index].needsSnapshot = false
+                tabs[index].hasUnsavedChanges = false
+                if activeTabID == id {
+                    openedURL = url
+                    markEditorSaved(tab.content)
+                }
+                status = htmlSaveStatus(for: url, persistence: persistence)
+                return true
+            } catch {
+                status = "Save failed: \(error.localizedDescription)"
+                return false
+            }
+        }
+
+        guard let url = tab.url ?? chooseSaveURL(defaultName: "chiselo-project.aislide", contentTypes: deckContentTypes) else {
+            status = "Save canceled"
+            return false
+        }
+
+        do {
+            let snapshotURL = try safeFileHistory.protectFileBeforeOverwrite(at: url, fallbackExtension: "aislide")
+            try tab.content.write(to: url, atomically: true, encoding: .utf8)
+            tabs[index].url = url
+            tabs[index].title = tabTitle(for: url)
+            tabs[index].originalContent = tab.content
+            tabs[index].needsSnapshot = false
+            tabs[index].hasUnsavedChanges = false
+            if activeTabID == id {
+                openedURL = url
+                clearEditorDirtyFlag()
+            }
+            status = safeFileHistory.saveStatus(for: url, snapshotURL: snapshotURL)
+            return true
+        } catch {
+            status = "Save failed: \(error.localizedDescription)"
+            return false
+        }
+    }
+
     func revealSafetyFolder() {
         guard let openedURL else {
             status = "This file does not have a save location yet"
@@ -1164,6 +1227,55 @@ final class EditorModel: ObservableObject {
 
         NSWorkspace.shared.activateFileViewerSelecting([openedURL])
         status = "No snapshot saved yet. Revealed the current file location"
+    }
+
+    func revealLocalResource(urlString: String) {
+        guard let url = URL(string: urlString), url.isFileURL else {
+            status = "The current writeback source is not a local file"
+            return
+        }
+
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+        status = "Located \(url.lastPathComponent)"
+    }
+
+    func selectNodesForSelectedStylesheetRule() {
+        guard hasOpenDocument, documentMode == "html" else {
+            status = "Open an HTML file first"
+            return
+        }
+
+        let source = "JSON.stringify(window.ChiseloEditor?.selectNodesForSelectedStylesheetRule?.() ?? null);"
+        webView?.evaluateJavaScript(source) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if let error {
+                    self.status = "Could not locate objects that match the rule: \(error.localizedDescription)"
+                    return
+                }
+
+                guard let json = result as? String,
+                      json != "null",
+                      let data = json.data(using: .utf8),
+                      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    self.status = "Could not locate objects that match the rule: the editor returned no result"
+                    return
+                }
+
+                if (object["ok"] as? Bool) == true {
+                    if let element = EditorBridgeDecoder.element(object["element"]) {
+                        self.updatePublished(\.selectedElement, to: element)
+                        self.updatePublished(\.selectionPath, to: element.htmlPath)
+                    }
+                    let selector = (object["selector"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "Current rule"
+                    let count = object["count"] as? Int ?? 0
+                    self.status = "\(selector) matches \(max(1, count)) objects"
+                } else {
+                    self.status = object["reason"] as? String ?? "Could not locate objects that match the rule"
+                }
+            }
+        }
     }
 
     func presentHistoryBrowser() {
@@ -1257,8 +1369,7 @@ final class EditorModel: ObservableObject {
                 at: openedURL,
                 fallbackExtension: documentMode == "html" ? "html" : "aislide"
             )
-            try FileManager.default.removeItem(at: openedURL)
-            try FileManager.default.copyItem(at: snapshotURL, to: openedURL)
+            try restoreSnapshotFile(from: snapshotURL, to: openedURL)
 
             let restoredContent = try readTextFile(at: openedURL)
             updateActiveTabAfterSave(url: openedURL, mode: documentMode, content: restoredContent)
@@ -1277,26 +1388,33 @@ final class EditorModel: ObservableObject {
     }
 
     func exportHTML() {
-        guard hasOpenDocument else {
-            status = "Open a project or drop in an HTML file first"
-            return
-        }
+        guard let context = beginDocumentOperation() else { return }
 
-        exportCurrentHTML { [weak self] html in
-            self?.saveHTML(html)
+        exportCurrentHTML(for: context) { [weak self] result in
+            guard let self else { return }
+            defer { self.finishDocumentOperation(context) }
+            switch result {
+            case .success(let html):
+                self.saveHTML(html)
+            case .failure(let error):
+                self.status = "Export failed: \(error.localizedDescription)"
+            }
         }
     }
 
     func exportEditableHTML() {
-        guard hasOpenDocument else {
-            status = "Open a project or drop in an HTML file first"
-            return
-        }
+        guard let context = beginDocumentOperation() else { return }
 
-        exportCurrentHTML { [weak self] html in
+        exportCurrentHTML(for: context) { [weak self] result in
             guard let self else { return }
-            let editableHTML = self.selfEditableHTML(from: html)
-            self.saveHTML(editableHTML, defaultName: self.editableHTMLDefaultName)
+            defer { self.finishDocumentOperation(context) }
+            switch result {
+            case .success(let html):
+                let editableHTML = self.selfEditableHTML(from: html)
+                self.saveHTML(editableHTML, defaultName: self.editableHTMLDefaultName(for: context.url))
+            case .failure(let error):
+                self.status = "Export failed: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -1306,11 +1424,24 @@ final class EditorModel: ObservableObject {
             return
         }
 
-        guard let url = chooseSaveURL(defaultName: "document.pdf", contentTypes: [.pdf]) else { return }
+        guard let context = beginDocumentOperation() else { return }
+        guard let url = chooseSaveURL(defaultName: "document.pdf", contentTypes: [.pdf]) else {
+            finishDocumentOperation(context)
+            return
+        }
         status = "Rendering PDF..."
 
-        exportCurrentHTML { [weak self] html in
-            self?.renderExport(html: html, outputURL: url, format: .pdf)
+        exportCurrentHTML(for: context) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let html):
+                self.renderExport(html: html, outputURL: url, format: .pdf, context: context) {
+                    self.finishDocumentOperation(context)
+                }
+            case .failure(let error):
+                self.status = "Export failed: \(error.localizedDescription)"
+                self.finishDocumentOperation(context)
+            }
         }
     }
 
@@ -1320,11 +1451,24 @@ final class EditorModel: ObservableObject {
             return
         }
 
-        guard let url = chooseSaveURL(defaultName: "document.pptx", contentTypes: [pptxContentType]) else { return }
+        guard let context = beginDocumentOperation() else { return }
+        guard let url = chooseSaveURL(defaultName: "document.pptx", contentTypes: [pptxContentType]) else {
+            finishDocumentOperation(context)
+            return
+        }
         status = "Exporting editable PPTX..."
 
-        exportCurrentHTML { [weak self] html in
-            self?.renderExport(html: html, outputURL: url, format: .pptx)
+        exportCurrentHTML(for: context) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let html):
+                self.renderExport(html: html, outputURL: url, format: .pptx, context: context) {
+                    self.finishDocumentOperation(context)
+                }
+            case .failure(let error):
+                self.status = "Export failed: \(error.localizedDescription)"
+                self.finishDocumentOperation(context)
+            }
         }
     }
 
@@ -1350,28 +1494,33 @@ final class EditorModel: ObservableObject {
             status = "Convert to Editable Version only applies in HTML document mode"
             return
         }
+        guard let context = beginDocumentOperation() else { return }
 
         status = "Converting to Editable Version..."
 
-        exportCurrentHTML { [weak self] html in
+        exportCurrentHTML(for: context) { [weak self] result in
             guard let self else { return }
-
-            if let index = self.activeTabIndex {
-                self.tabs[index].content = html
-                self.tabs[index].mode = "html"
-                self.tabs[index].needsSnapshot = false
-                self.clearEditorDirtyFlag()
+            guard case .success(let html) = result else {
+                if case .failure(let error) = result {
+                    self.status = "Could not convert to an editable version: \(error.localizedDescription)"
+                } else {
+                    self.status = "Could not convert to an editable version: the HTML could not be read"
+                }
+                self.finishDocumentOperation(context)
+                return
             }
 
             guard let data = html.data(using: .utf8) else {
-                self.status = "Convert to Editable Version failed: could not encode the HTML"
+                self.status = "Could not convert to an editable version: the HTML could not be encoded"
+                self.finishDocumentOperation(context)
                 return
             }
 
             let base64 = data.base64EncodedString()
-            let baseHref = self.openedURL?.deletingLastPathComponent().absoluteString ?? ""
+            let baseHref = context.url?.deletingLastPathComponent().absoluteString ?? ""
             guard let baseLiteral = self.jsStringLiteral(baseHref) else {
-                self.status = "Convert to Editable Version failed: could not resolve the resource path"
+                self.status = "Could not convert to an editable version: resource paths could not be resolved"
+                self.finishDocumentOperation(context)
                 return
             }
 
@@ -1380,60 +1529,100 @@ final class EditorModel: ObservableObject {
               .then(deck => JSON.stringify(deck));
             """
 
-            self.webView?.evaluateJavaScript(script) { [weak self] result, error in
+            guard let webView = self.webView else {
+                self.status = "Could not convert to an editable version: the editor is not ready"
+                self.finishDocumentOperation(context)
+                return
+            }
+
+            webView.evaluateJavaScript(script) { [weak self] result, error in
                 Task { @MainActor in
                     guard let self else { return }
 
                     if let error {
-                        self.status = "Convert to Editable Version failed: \(error.localizedDescription)"
+                        self.status = "Could not convert to an editable version: \(error.localizedDescription)"
+                        self.finishDocumentOperation(context)
                         return
                     }
 
                     guard let json = result as? String, !json.isEmpty else {
-                        self.status = "Convert to Editable Version failed: no editable object structure"
+                        self.status = "Could not convert to an editable version: no editable object structure was found"
+                        self.finishDocumentOperation(context)
                         return
                     }
 
                     let id = UUID()
-                    let title = self.frozenLayoutTitle()
-                    self.tabs.append(EditorTab(id: id, title: title, url: nil, mode: "deck", content: json, needsSnapshot: false))
+                    let title = self.frozenLayoutTitle(for: context.title)
+                    self.tabs.append(EditorTab(
+                        id: id,
+                        title: title,
+                        url: nil,
+                        mode: "deck",
+                        content: json,
+                        needsSnapshot: false,
+                        hasUnsavedChanges: true
+                    ))
                     self.activeTabID = id
                     self.openedURL = nil
                     self.loadDeckJSON(json)
-                    self.status = "Converted to Editable Version: \(title)"
+                    self.status = "Converted to an editable version: \(title)"
+                    self.finishDocumentOperation(context)
                 }
             }
         }
     }
 
-    private func exportCurrentHTML(completion: @escaping (String) -> Void) {
-        guard hasOpenDocument else {
-            status = "Open a project or drop in an HTML file first"
+    private func exportCurrentHTML(
+        for context: DocumentOperationContext,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        guard activeDocumentOperationToken == context.token,
+              activeTabID == context.tabID else {
+            completion(.failure(DocumentOperationError.documentChanged))
+            return
+        }
+        guard let webView else {
+            completion(.failure(DocumentOperationError.webViewUnavailable))
             return
         }
 
-        webView?.evaluateJavaScript("window.ChiseloEditor?.exportHTML();") { [weak self] result, error in
+        webView.evaluateJavaScript("window.ChiseloEditor?.exportHTML();") { [weak self] result, error in
             Task { @MainActor in
                 guard let self else { return }
 
                 if let error {
-                    self.status = "Export failed: \(error.localizedDescription)"
+                    completion(.failure(error))
                     return
                 }
 
                 guard let html = result as? String else {
-                    self.status = "Export failed: no HTML returned"
+                    completion(.failure(DocumentOperationError.noHTMLReturned))
                     return
                 }
 
-                completion(html)
+                guard self.activeDocumentOperationToken == context.token,
+                      self.activeTabID == context.tabID else {
+                    completion(.failure(DocumentOperationError.documentChanged))
+                    return
+                }
+                completion(.success(html))
             }
         }
     }
 
-    private func renderExport(html: String, outputURL: URL, format: RenderExportFormat) {
-        let baseURL = openedURL?.deletingLastPathComponent()
-        let exporter = HTMLRenderExporter(html: html, baseURL: baseURL)
+    private func renderExport(
+        html: String,
+        outputURL: URL,
+        format: RenderExportFormat,
+        context: DocumentOperationContext,
+        completion: @escaping () -> Void
+    ) {
+        let baseURL = context.url?.deletingLastPathComponent()
+        let exporter = HTMLRenderExporter(
+            html: html,
+            baseURL: baseURL,
+            trustedContent: context.runtimeMode == .live
+        )
         activeRenderExporter = exporter
 
         if format == .pptx {
@@ -1454,6 +1643,7 @@ final class EditorModel: ObservableObject {
                     case .failure(let error):
                         self.status = "Export failed: \(error.localizedDescription)"
                     }
+                    completion()
                 }
             }
             return
@@ -1481,6 +1671,7 @@ final class EditorModel: ObservableObject {
                 case .failure(let error):
                     self.status = "Export failed: \(error.localizedDescription)"
                 }
+                completion()
             }
         }
     }
@@ -1557,13 +1748,29 @@ final class EditorModel: ObservableObject {
         runJavaScript("window.ChiseloEditor?.setBackdropStyle?.(\(literal));")
     }
 
-    private func markActiveTabNeedsSnapshot() {
-        guard let index = activeTabIndex, !tabs[index].needsSnapshot else { return }
-        tabs[index].needsSnapshot = true
+    private func markActiveTabDirty() {
+        guard let index = activeTabIndex else { return }
+        if !tabs[index].needsSnapshot {
+            tabs[index].needsSnapshot = true
+        }
+        if !tabs[index].hasUnsavedChanges {
+            tabs[index].hasUnsavedChanges = true
+        }
+    }
+
+    private func markActiveTabCleanAfterUndo() {
+        guard let index = activeTabIndex else { return }
+        tabs[index].hasUnsavedChanges = false
+        tabs[index].needsSnapshot = false
     }
 
     private func clearEditorDirtyFlag() {
         runJavaScript("window.ChiseloEditor?.clearDirty?.();")
+    }
+
+    private func markEditorSaved(_ content: String) {
+        let base64 = Data(content.utf8).base64EncodedString()
+        runJavaScript("window.ChiseloEditor?.markSavedFromBase64?.('\(base64)');")
     }
 
     private func resetHTMLVisualSnapshots() {
@@ -1608,7 +1815,7 @@ final class EditorModel: ObservableObject {
                 }
 
                 if (object["ok"] as? Bool) == true {
-                    if let element = self.bridgeElement(object["element"]) {
+                    if let element = EditorBridgeDecoder.element(object["element"]) {
                         self.updatePublished(\.selectedElement, to: element)
                         self.updatePublished(\.selectionPath, to: element.htmlPath)
                     }
@@ -1617,6 +1824,179 @@ final class EditorModel: ObservableObject {
                     self.status = "Source snippet applied. Use Undo to revert"
                 } else {
                     self.status = object["reason"] as? String ?? "Could not apply the source snippet"
+                }
+            }
+        }
+    }
+
+    func applySelectedHTMLAttributes(className: String, inlineStyle: String, linkHref: String, linkTarget: String) {
+        guard hasOpenDocument, documentMode == "html" else {
+            status = "Open an HTML file first"
+            return
+        }
+
+        let payload = [
+            "className": className,
+            "inlineStyle": inlineStyle,
+            "linkHref": linkHref,
+            "linkTarget": linkTarget
+        ]
+
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+              let json = String(data: data, encoding: .utf8) else {
+            status = "The HTML attributes contain unsupported characters"
+            return
+        }
+
+        let source = "JSON.stringify(window.ChiseloEditor?.applySelectedHTMLAttributes?.(\(json)) ?? null);"
+        webView?.evaluateJavaScript(source) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if let error {
+                    self.status = "Could not apply HTML attributes: \(error.localizedDescription)"
+                    return
+                }
+
+                guard let json = result as? String,
+                      json != "null",
+                      let data = json.data(using: .utf8),
+                      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    self.status = "Could not apply HTML attributes: the editor returned no result"
+                    return
+                }
+
+                if (object["ok"] as? Bool) == true {
+                    if let element = EditorBridgeDecoder.element(object["element"]) {
+                        self.updatePublished(\.selectedElement, to: element)
+                        self.updatePublished(\.selectionPath, to: element.htmlPath)
+                    }
+                    self.refreshHTMLDiagnostics()
+                    self.status = "HTML attributes applied to the current object. Use Undo to restore them."
+                } else {
+                    self.status = object["reason"] as? String ?? "Could not apply HTML attributes"
+                }
+            }
+        }
+    }
+
+    func applySelectedStylesheetRule(_ ruleText: String) {
+        guard hasOpenDocument, documentMode == "html" else {
+            status = "Open an HTML file first"
+            return
+        }
+
+        guard let literal = jsStringLiteral(ruleText) else {
+            status = "The CSS rule contains unsupported characters"
+            return
+        }
+
+        let source = "JSON.stringify(window.ChiseloEditor?.applySelectedStylesheetRule?.(\(literal)) ?? null);"
+        webView?.evaluateJavaScript(source) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if let error {
+                    self.status = "Could not apply the CSS rule: \(error.localizedDescription)"
+                    return
+                }
+
+                guard let json = result as? String,
+                      json != "null",
+                      let data = json.data(using: .utf8),
+                      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    self.status = "Could not apply the CSS rule: the editor returned no result"
+                    return
+                }
+
+                if (object["ok"] as? Bool) == true {
+                    if let element = EditorBridgeDecoder.element(object["element"]) {
+                        self.updatePublished(\.selectedElement, to: element)
+                        self.updatePublished(\.selectionPath, to: element.htmlPath)
+                    }
+                    self.refreshHTMLDiagnostics()
+                    self.status = "The current CSS rule was applied. Use Undo to restore it."
+                } else {
+                    self.status = object["reason"] as? String ?? "Could not apply the CSS rule"
+                }
+            }
+        }
+    }
+
+    func validateSelectedStylesheetRuleDraft(_ ruleText: String, completion: @escaping (String?) -> Void) {
+        guard hasOpenDocument, documentMode == "html" else {
+            completion(nil)
+            return
+        }
+
+        guard let literal = jsStringLiteral(ruleText) else {
+            completion("The CSS rule contains unsupported characters")
+            return
+        }
+
+        let source = "JSON.stringify(window.ChiseloEditor?.validateSelectedStylesheetRule?.(\(literal)) ?? null);"
+        webView?.evaluateJavaScript(source) { result, _ in
+            guard let json = result as? String,
+                  json != "null",
+                  let data = json.data(using: .utf8),
+                  let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                completion("CSS rule validation failed")
+                return
+            }
+
+            if (object["ok"] as? Bool) == true {
+                completion(nil)
+            } else {
+                completion(object["reason"] as? String ?? "CSS rule validation failed")
+            }
+        }
+    }
+
+    func setHTMLPseudoPreviewState(_ state: String) {
+        guard hasOpenDocument, documentMode == "html" else {
+            status = "Open an HTML file first"
+            return
+        }
+
+        guard let literal = jsStringLiteral(state) else {
+            status = "The pseudo-class preview state is invalid"
+            return
+        }
+
+        let source = "JSON.stringify(window.ChiseloEditor?.setPseudoPreviewState?.(\(literal)) ?? null);"
+        webView?.evaluateJavaScript(source) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if let error {
+                    self.status = "Could not change the pseudo-class preview: \(error.localizedDescription)"
+                    return
+                }
+
+                guard let json = result as? String,
+                      json != "null",
+                      let data = json.data(using: .utf8),
+                      let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    self.status = "Could not change the pseudo-class preview: the editor returned no result"
+                    return
+                }
+
+                if (object["ok"] as? Bool) == true {
+                    if let element = EditorBridgeDecoder.element(object["element"]) {
+                        self.updatePublished(\.selectedElement, to: element)
+                        self.updatePublished(\.selectionPath, to: element.htmlPath)
+                    }
+                    let normalized = (object["state"] as? String)?.lowercased() ?? "none"
+                    switch normalized {
+                    case "hover":
+                        self.status = "Previewing the current object's hover state"
+                    case "focus":
+                        self.status = "Previewing the current object's focus state"
+                    default:
+                        self.status = "The current object's normal state was restored"
+                    }
+                } else {
+                    self.status = object["reason"] as? String ?? "Could not change the pseudo-class preview"
                 }
             }
         }
@@ -1664,7 +2044,7 @@ final class EditorModel: ObservableObject {
                     return
                 }
 
-                let mapping = self.bridgeSourceDraftMappingSummary(object["mappingSummary"])
+                let mapping = EditorBridgeDecoder.sourceDraftMappingSummary(object["mappingSummary"])
                 self.updatePublished(\.sourceDraftMappingSummary, to: mapping)
                 completion(mapping)
             }
@@ -1802,9 +2182,9 @@ final class EditorModel: ObservableObject {
     }
 
     private func visualSnapshotCapturePlan(from object: [String: Any]) -> VisualSnapshotCapturePlan {
-        let contentWidth = max(1, bridgeCGFloat(object["contentWidth"]) ?? 1)
-        let contentHeight = max(1, bridgeCGFloat(object["contentHeight"]) ?? bridgeCGFloat(object["height"]) ?? 1)
-        let viewportHeight = max(1, (object["rect"] as? [String: Any]).flatMap { bridgeCGFloat($0["height"]) } ?? contentHeight)
+        let contentWidth = max(1, EditorBridgeDecoder.cgFloat(object["contentWidth"]) ?? 1)
+        let contentHeight = max(1, EditorBridgeDecoder.cgFloat(object["contentHeight"]) ?? EditorBridgeDecoder.cgFloat(object["height"]) ?? 1)
+        let viewportHeight = max(1, (object["rect"] as? [String: Any]).flatMap { EditorBridgeDecoder.cgFloat($0["height"]) } ?? contentHeight)
         let maxSegments = 6
         var segments: [CGFloat] = []
         let maxOffset = max(0, contentHeight - viewportHeight)
@@ -1858,10 +2238,10 @@ final class EditorModel: ObservableObject {
 
                     let webBounds = webView.bounds
                     let rect = NSRect(
-                        x: max(0, self.bridgeCGFloat(rectObject["x"]) ?? 0),
-                        y: max(0, self.bridgeCGFloat(rectObject["y"]) ?? 0),
-                        width: max(1, self.bridgeCGFloat(rectObject["width"]) ?? webBounds.width),
-                        height: max(1, self.bridgeCGFloat(rectObject["height"]) ?? webBounds.height)
+                        x: max(0, EditorBridgeDecoder.cgFloat(rectObject["x"]) ?? 0),
+                        y: max(0, EditorBridgeDecoder.cgFloat(rectObject["y"]) ?? 0),
+                        width: max(1, EditorBridgeDecoder.cgFloat(rectObject["width"]) ?? webBounds.width),
+                        height: max(1, EditorBridgeDecoder.cgFloat(rectObject["height"]) ?? webBounds.height)
                     ).intersection(webBounds)
 
                     guard rect.width > 1, rect.height > 1 else {
@@ -2072,7 +2452,7 @@ final class EditorModel: ObservableObject {
 
     func updateElement(_ element: EditorElement) {
         updatePublished(\.selectedElement, to: element)
-        markActiveTabNeedsSnapshot()
+        markActiveTabDirty()
 
         do {
             let data = try encoder.encode(element)
@@ -2105,8 +2485,20 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    private func importHTML(_ html: String, from url: URL?) {
-        guard let data = html.data(using: .utf8) else { return }
+    private func importHTML(
+        _ html: String,
+        from url: URL?,
+        stylesheetOverrides: [HTMLLocalStylesheetSavePayload] = [],
+        runtimeMode: HTMLRuntimeMode = .safe,
+        originalHTML: String? = nil,
+        documentModified: Bool = false
+    ) {
+        let editorHTML = injectLocalStylesheetMirrors(
+            into: html,
+            relativeTo: url,
+            stylesheetOverrides: stylesheetOverrides
+        )
+        guard let data = editorHTML.data(using: .utf8) else { return }
         resetHTMLVisualSnapshots()
         pendingHTMLVisualBaselineCapture = true
         deck = nil
@@ -2119,9 +2511,33 @@ final class EditorModel: ObservableObject {
         refreshDocumentStats()
         status = "HTML document mode: \(url?.lastPathComponent ?? "Untitled HTML")"
         let base64 = data.base64EncodedString()
+        let originalBase64 = Data((originalHTML ?? html).utf8).base64EncodedString()
         let baseHref = url?.deletingLastPathComponent().absoluteString ?? ""
         guard let baseLiteral = jsStringLiteral(baseHref) else { return }
-        runJavaScript("window.ChiseloEditor?.openHTMLFromBase64('\(base64)', \(baseLiteral))?.catch(error => console.error(error));")
+        guard let runtimeLiteral = jsStringLiteral(runtimeMode.rawValue) else { return }
+        let previewWidth = htmlPreviewDevice.viewportWidth.map(String.init) ?? "null"
+        let source = "window.ChiseloEditor?.openHTMLFromBase64('\(base64)', \(baseLiteral), { runtimeMode: \(runtimeLiteral), previewWidth: \(previewWidth), originalSourceBase64: '\(originalBase64)', documentModified: \(documentModified ? "true" : "false") })?.catch(error => console.error(error));"
+        applyHTMLRuntimeSecurity(runtimeMode) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.runJavaScript(source)
+            case .failure(let error):
+                self.status = "Could not load HTML: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func applyHTMLRuntimeSecurity(
+        _ runtimeMode: HTMLRuntimeMode,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        guard let webView = webView as? DropAwareWebView else {
+            completion(.failure(HTMLRuntimeSecurityError.ruleListUnavailable))
+            return
+        }
+        let securityMode: HTMLRuntimeSecurityMode = runtimeMode == .safe ? .isolated : .trusted
+        webView.applyRuntimeSecurity(securityMode, completion: completion)
     }
 
     private func runJavaScript(_ source: String) {
@@ -2144,43 +2560,34 @@ final class EditorModel: ObservableObject {
         }
     }
 
-    private var editableHTMLDefaultName: String {
-        guard let openedURL else { return "document-editable.html" }
-        let baseName = openedURL.deletingPathExtension().lastPathComponent
+    private func editableHTMLDefaultName(for sourceURL: URL?) -> String {
+        guard let sourceURL else { return "document-editable.html" }
+        let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let safeName = baseName.isEmpty ? "document" : baseName
         return "\(safeName)-editable.html"
     }
 
     private func selfEditableHTML(from html: String) -> String {
-        let runtime = Self.selfEditableHTMLRuntime
-        if let range = html.range(of: "</body>", options: [.caseInsensitive, .backwards]) {
-            return html.replacingCharacters(in: range, with: "\n\(runtime)\n</body>")
-        }
-
-        if let range = html.range(of: "</html>", options: [.caseInsensitive, .backwards]) {
-            return html.replacingCharacters(in: range, with: "\n\(runtime)\n</html>")
-        }
-
-        return "\(html)\n\(runtime)\n"
+        replacingSelfEditableHTMLRuntime(in: html, with: Self.selfEditableHTMLRuntime)
     }
 
     private func saveCurrentHTML() {
-        webView?.evaluateJavaScript("window.ChiseloEditor?.exportHTML();") { [weak self] result, error in
+        guard let context = beginDocumentOperation() else { return }
+
+        exportCurrentHTMLSavePayload(for: context) { [weak self] result in
             Task { @MainActor in
                 guard let self else { return }
+                defer { self.finishDocumentOperation(context) }
 
-                if let error {
-                    self.status = "Save failed: \(error.localizedDescription)"
+                guard case .success(let payload) = result else {
+                    if case .failure(let error) = result {
+                        self.status = "Save failed: \(error.localizedDescription)"
+                    }
                     return
                 }
 
-                guard let html = result as? String else {
-                    self.status = "Save failed: no HTML returned"
-                    return
-                }
-
-                guard let url = self.openedURL ?? self.chooseSaveURL(defaultName: "document.html", contentTypes: [.html]) else { return }
-                let isOverwritingOpenedFile = self.openedURL != nil
+                guard let url = context.url ?? self.chooseSaveURL(defaultName: "document.html", contentTypes: [.html]) else { return }
+                let isOverwritingOpenedFile = context.url != nil
 
                 if isOverwritingOpenedFile {
                     let diagnostics = await self.currentHTMLDiagnosticsForSave() ?? self.htmlDiagnostics
@@ -2197,16 +2604,76 @@ final class EditorModel: ObservableObject {
                 }
 
                 do {
-                    let snapshotURL = try self.safeFileHistory.protectFileBeforeOverwrite(at: url, fallbackExtension: "html")
-                    try html.write(to: url, atomically: true, encoding: .utf8)
-                    self.openedURL = url
-                    self.updateActiveTabAfterSave(url: url, mode: "html", content: html)
-                    self.status = self.safeFileHistory.saveStatus(for: url, snapshotURL: snapshotURL)
+                    let persistence = try persistHTMLDocumentSavePayload(payload, to: url, safeFileHistory: self.safeFileHistory)
+                    if self.activeTabID == context.tabID {
+                        self.openedURL = url
+                    }
+                    self.updateTabAfterSave(id: context.tabID, url: url, mode: "html", content: payload.html)
+                    self.status = self.htmlSaveStatus(for: url, persistence: persistence)
                 } catch {
                     self.status = "Save failed: \(error.localizedDescription)"
                 }
             }
         }
+    }
+
+    private func exportCurrentHTMLSavePayload(
+        for context: DocumentOperationContext,
+        completion: @escaping (Result<HTMLDocumentSavePayload, Error>) -> Void
+    ) {
+        guard activeDocumentOperationToken == context.token,
+              activeTabID == context.tabID else {
+            completion(.failure(DocumentOperationError.documentChanged))
+            return
+        }
+        guard let webView else {
+            completion(.failure(DocumentOperationError.webViewUnavailable))
+            return
+        }
+
+        let script = """
+        JSON.stringify(
+          window.ChiseloEditor?.exportHTMLSavePayload?.()
+          ?? { html: window.ChiseloEditor?.exportHTML?.() ?? "", localStylesheets: [] }
+        );
+        """
+
+        webView.evaluateJavaScript(script) { [weak self] result, error in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if let error {
+                    completion(.failure(error))
+                    return
+                }
+
+                guard let json = result as? String,
+                      let data = json.data(using: .utf8),
+                      let payload = try? JSONDecoder().decode(HTMLDocumentSavePayload.self, from: data) else {
+                    completion(.failure(DocumentOperationError.invalidSavePayload))
+                    return
+                }
+
+                guard self.activeDocumentOperationToken == context.token,
+                      self.activeTabID == context.tabID else {
+                    completion(.failure(DocumentOperationError.documentChanged))
+                    return
+                }
+                completion(.success(payload))
+            }
+        }
+    }
+
+    private func htmlSaveStatus(for url: URL, persistence: HTMLSavePersistenceResult) -> String {
+        var summary = safeFileHistory.saveStatus(for: url, snapshotURL: persistence.htmlSnapshotURL)
+        let stylesheetCount = persistence.stylesheetWritebacks.count
+        guard stylesheetCount > 0 else { return summary }
+        if stylesheetCount == 1, let only = persistence.stylesheetWritebacks.first {
+            summary += " · Wrote back local CSS \(only.url.lastPathComponent)"
+            return summary
+        }
+        summary += " · Wrote back \(stylesheetCount) local CSS files"
+        return summary
     }
 
     private func currentHTMLDiagnosticsForSave() async -> HTMLDiagnostics? {
@@ -2295,12 +2762,14 @@ final class EditorModel: ObservableObject {
         }
         let cleanlinessLine = "Source cleanliness: \(diagnostics.sourceCleanlinessPercent)%\(diagnostics.cleanExport ? " — no editor-only markers detected" : " — \(diagnostics.exportArtifactCount ?? 0) editor-only marker(s) still need attention")"
         let sourceLine = saveReviewSourcePollutionLine(diagnostics)
+        let precisionLine = saveReviewPrecisionEditingLine(diagnostics)
 
         return [
             "About to overwrite: \(url.lastPathComponent)",
             backupLine,
             changeLine,
             responsiveLine,
+            precisionLine,
             cleanlinessLine,
             sourceLine,
             issueLine,
@@ -2335,6 +2804,16 @@ final class EditorModel: ObservableObject {
             return "Stylesheet review: \(externalAffectedChanges) changed object(s) may be affected by \(externalSheets) external stylesheet(s). Review widths and class effects before saving"
         }
         return nil
+    }
+
+    private func saveReviewPrecisionEditingLine(_ diagnostics: HTMLDiagnostics) -> String? {
+        guard diagnostics.precisionEditingRiskCount > 0 || (diagnostics.clippedGeometryCount ?? 0) > 0 else {
+            return nil
+        }
+        if (diagnostics.clippedGeometryCount ?? 0) > 0 {
+            return "Editing structure: \(diagnostics.clippedGeometryCount ?? 0) objects are clipped by parent overflow. Resolve the clipping boundary first."
+        }
+        return "Editing structure: \(diagnostics.precisionEditingRiskDetail)"
     }
 
     private func saveReviewResponsiveWidths(_ diagnostics: HTMLDiagnostics) -> String {
@@ -2433,21 +2912,55 @@ final class EditorModel: ObservableObject {
         return tabs.firstIndex(where: { $0.id == activeTabID })
     }
 
+    private func beginDocumentOperation() -> DocumentOperationContext? {
+        guard hasOpenDocument, let index = activeTabIndex else {
+            status = "Open a project or drop an HTML file first"
+            return nil
+        }
+        guard activeDocumentOperationToken == nil else {
+            status = "Wait for the current save, export, or conversion to finish"
+            return nil
+        }
+
+        let tab = tabs[index]
+        let token = UUID()
+        activeDocumentOperationToken = token
+        isDocumentOperationInProgress = true
+        return DocumentOperationContext(
+            token: token,
+            tabID: tab.id,
+            url: tab.url,
+            runtimeMode: tab.runtimeMode,
+            title: tab.title
+        )
+    }
+
+    private func finishDocumentOperation(_ context: DocumentOperationContext) {
+        guard activeDocumentOperationToken == context.token else { return }
+        activeDocumentOperationToken = nil
+        isDocumentOperationInProgress = false
+    }
+
     private func captureActiveTabSnapshot(completion: @escaping () -> Void) {
+        captureActiveTabSnapshot(force: false) { _ in completion() }
+    }
+
+    private func captureActiveTabSnapshot(force: Bool, completion: @escaping (Bool) -> Void) {
         guard let index = activeTabIndex, webView != nil else {
-            completion()
+            completion(true)
             return
         }
 
-        guard tabs[index].needsSnapshot else {
-            completion()
+        guard force || tabs[index].needsSnapshot else {
+            completion(true)
             return
         }
 
         let mode = tabs[index].mode
+        let tabID = tabs[index].id
         let source: String
         if mode == "html" || documentMode == "html" {
-            source = "window.ChiseloEditor?.exportHTML();"
+            source = "JSON.stringify(window.ChiseloEditor?.exportHTMLSavePayload?.() ?? { html: window.ChiseloEditor?.exportHTML?.() ?? '', localStylesheets: [] });"
         } else {
             source = "JSON.stringify(window.ChiseloEditor?.getDeck?.() ?? null);"
         }
@@ -2458,26 +2971,40 @@ final class EditorModel: ObservableObject {
 
                 if let error {
                     self.status = "Could not snapshot tab: \(error.localizedDescription)"
-                    completion()
+                    completion(false)
                     return
                 }
 
-                guard let currentIndex = self.activeTabIndex else {
-                    completion()
+                guard let currentIndex = self.tabs.firstIndex(where: { $0.id == tabID }) else {
+                    completion(false)
                     return
                 }
 
-                if let html = result as? String, mode == "html" || self.documentMode == "html" {
-                    self.tabs[currentIndex].content = html
+                if let json = result as? String, mode == "html" {
+                    guard let data = json.data(using: .utf8),
+                          let payload = try? JSONDecoder().decode(HTMLDocumentSavePayload.self, from: data) else {
+                        self.status = "Could not snapshot tab: no HTML returned"
+                        completion(false)
+                        return
+                    }
+                    self.tabs[currentIndex].content = payload.html
+                    self.tabs[currentIndex].localStylesheets = payload.localStylesheets
+                    self.tabs[currentIndex].hasUnsavedChanges = htmlDocumentSavePayloadHasChanges(
+                        payload,
+                        originalHTML: self.tabs[currentIndex].originalContent
+                    )
                 } else if let json = result as? String, json != "null", mode == "deck" {
-                    self.tabs[currentIndex].content = self.prettyDeckJSON(from: json) ?? json
+                    let content = self.prettyDeckJSON(from: json) ?? json
+                    self.tabs[currentIndex].content = content
+                    self.tabs[currentIndex].hasUnsavedChanges = content != self.tabs[currentIndex].originalContent
                 } else if mode == "deck", let json = self.deckJSON {
                     self.tabs[currentIndex].content = json
+                    self.tabs[currentIndex].hasUnsavedChanges = json != self.tabs[currentIndex].originalContent
                 }
 
                 self.tabs[currentIndex].needsSnapshot = false
                 self.clearEditorDirtyFlag()
-                completion()
+                completion(true)
             }
         }
     }
@@ -2512,7 +3039,14 @@ final class EditorModel: ObservableObject {
         resetEditorHistoryState()
 
         if tab.mode == "html" {
-            importHTML(tab.content, from: tab.url)
+            importHTML(
+                tab.content,
+                from: tab.url,
+                stylesheetOverrides: tab.localStylesheets,
+                runtimeMode: tab.runtimeMode,
+                originalHTML: tab.originalContent.isEmpty ? tab.content : tab.originalContent,
+                documentModified: tab.hasUnsavedChanges
+            )
         } else {
             loadDeckJSON(tab.content)
         }
@@ -2573,7 +3107,16 @@ final class EditorModel: ObservableObject {
                 }
 
                 let id = UUID()
-                tabs.append(EditorTab(id: id, title: payload.title, url: payload.url, mode: payload.mode, content: payload.content, needsSnapshot: false))
+                tabs.append(EditorTab(
+                    id: id,
+                    title: payload.title,
+                    url: payload.url,
+                    mode: payload.mode,
+                    content: payload.content,
+                    originalContent: payload.content,
+                    needsSnapshot: false,
+                    hasUnsavedChanges: false
+                ))
                 tabSafetyInfo[id] = safety
                 lastID = id
                 openedCount += 1
@@ -2619,13 +3162,26 @@ final class EditorModel: ObservableObject {
     }
 
     private func updateActiveTabAfterSave(url: URL, mode: String, content: String) {
-        guard let index = activeTabIndex else { return }
+        guard let activeTabID else { return }
+        updateTabAfterSave(id: activeTabID, url: url, mode: mode, content: content)
+    }
+
+    private func updateTabAfterSave(id: UUID, url: URL, mode: String, content: String) {
+        guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
         tabs[index].url = url
         tabs[index].title = tabTitle(for: url)
         tabs[index].mode = mode
         tabs[index].content = content
+        tabs[index].originalContent = content
+        tabs[index].localStylesheets = []
         tabs[index].needsSnapshot = false
-        clearEditorDirtyFlag()
+        tabs[index].hasUnsavedChanges = false
+        guard activeTabID == id else { return }
+        if mode == "html" {
+            markEditorSaved(content)
+        } else {
+            clearEditorDirtyFlag()
+        }
     }
 
     private func tabTitle(for url: URL) -> String {
@@ -2633,8 +3189,7 @@ final class EditorModel: ObservableObject {
         return title.isEmpty ? "Untitled" : title
     }
 
-    private func frozenLayoutTitle() -> String {
-        let baseTitle = activeTabIndex.flatMap { tabs.indices.contains($0) ? tabs[$0].title : nil } ?? "HTML Document"
+    private func frozenLayoutTitle(for baseTitle: String) -> String {
         let root = baseTitle
             .replacingOccurrences(of: " - Frozen Layout", with: "")
             .replacingOccurrences(of: " - Editable Version", with: "")
@@ -2658,69 +3213,6 @@ final class EditorModel: ObservableObject {
         return String(data: encoded, encoding: .utf8)
     }
 
-}
-
-private func readOpenTabPayload(_ url: URL) -> OpenTabReadResult {
-    let didAccess = url.startAccessingSecurityScopedResource()
-    defer {
-        if didAccess {
-            url.stopAccessingSecurityScopedResource()
-        }
-    }
-
-    do {
-        let content = try readTextFile(at: url)
-        let ext = url.pathExtension.lowercased()
-        let mode = ["html", "htm", "xhtml"].contains(ext) ? "html" : "deck"
-
-        if mode == "deck" {
-            guard let data = content.data(using: .utf8) else {
-                return .failure(filename: url.lastPathComponent, message: "Could not read \(url.lastPathComponent)")
-            }
-            _ = try JSONDecoder().decode(EditorDeck.self, from: data)
-        }
-
-        let title = url.lastPathComponent.isEmpty ? "Untitled" : url.lastPathComponent
-        return .success(OpenTabPayload(title: title, url: url, mode: mode, content: content))
-    } catch {
-        return .failure(filename: url.lastPathComponent, message: "Open failed for \(url.lastPathComponent): \(error.localizedDescription)")
-    }
-}
-
-private func readTextFile(at url: URL) throws -> String {
-    let data = try Data(contentsOf: url)
-    for encoding in textFileEncodingCandidates {
-        if let string = String(data: data, encoding: encoding) {
-            return string
-        }
-    }
-
-    throw CocoaError(.fileReadCorruptFile)
-}
-
-private let textFileEncodingCandidates: [String.Encoding] = [
-    .utf8,
-    .utf16,
-    .utf16LittleEndian,
-    .utf16BigEndian,
-    .utf32,
-    .utf32LittleEndian,
-    .utf32BigEndian,
-    .isoLatin1,
-    .windowsCP1252,
-    .ascii,
-    String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue)))
-]
-
-private extension Array where Element == OpenTabReadResult {
-    var successCount: Int {
-        reduce(0) { total, result in
-            if case .success = result {
-                return total + 1
-            }
-            return total
-        }
-    }
 }
 
 private enum RenderExportFormat {

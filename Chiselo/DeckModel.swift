@@ -25,6 +25,10 @@ struct EditorElement: Codable, Identifiable, Equatable {
     var type: String
     var tagName: String?
     var htmlPath: String?
+    var className: String?
+    var inlineStyle: String?
+    var linkHref: String?
+    var linkTarget: String?
     var semanticRole: String?
     var semanticLabel: String?
     var groupId: String?
@@ -36,6 +40,12 @@ struct EditorElement: Codable, Identifiable, Equatable {
     var sourceAncestorItems: [EditorSourceNodeItem]?
     var sourceSiblingItems: [EditorSourceNodeItem]?
     var sourceChildItems: [EditorSourceNodeItem]?
+    var editSafetyLevel: String?
+    var editSafetyTitle: String?
+    var editSafetyDetail: String?
+    var editSafetyOperations: [String]?
+    var editSafetyTargetId: String?
+    var editSafetyContainerId: String?
     var editability: String?
     var fidelity: String?
     var captureNote: String?
@@ -62,6 +72,12 @@ struct EditorSourceNodeItem: Codable, Identifiable, Equatable {
     var canEditText: Bool?
     var textPreview: String?
     var depth: Int?
+}
+
+struct StylesheetRuleMatchSummary: Codable, Equatable {
+    var selector: String
+    var count: Int
+    var items: [EditorSourceNodeItem]
 }
 
 struct SourceDraftMappingItem: Codable, Equatable, Identifiable {
@@ -151,10 +167,42 @@ struct EditorElementStyle: Codable, Equatable {
     var shadow: String?
     var textAlign: String?
     var objectFit: String?
+    // Box model
+    var paddingTop: Double?
+    var paddingRight: Double?
+    var paddingBottom: Double?
+    var paddingLeft: Double?
+    var marginTop: Double?
+    var marginRight: Double?
+    var marginBottom: Double?
+    var marginLeft: Double?
+    // Layout
+    var display: String?
+    var flexDirection: String?
+    var justifyContent: String?
+    var alignItems: String?
+    var gap: Double?
+    var flexWrap: String?
+    // Position & misc
+    var position: String?
+    var overflow: String?
+    var opacity: Double?
+    var letterSpacing: Double?
+    var textDecoration: String?
+    var textTransform: String?
+    var whiteSpace: String?
+    var cursor: String?
+    // Writeback metadata
     var writebackKind: String?
     var writebackLabel: String?
     var writebackTarget: String?
     var writebackDetail: String?
+    var writebackSourceKind: String?
+    var writebackSourceLabel: String?
+    var writebackSourceURL: String?
+    var writebackRuleSnippet: String?
+    var writebackRuleLine: Int?
+    var writebackMatchSummary: StylesheetRuleMatchSummary?
 }
 
 struct BridgeSelectionMessage: Decodable {
@@ -327,12 +375,21 @@ struct HTMLDiagnostics: Codable, Equatable {
     var exportArtifactCount: Int?
     var textOverflowCount: Int?
     var outOfBoundsCount: Int?
+    var clippedGeometryCount: Int?
+    var clipContainerCount: Int?
+    var clippedContentCount: Int?
+    var tableClipRiskCount: Int?
+    var layoutManagedObjectCount: Int?
     var overlapCount: Int?
     var resourceElementId: String?
     var tableElementId: String?
     var svgElementId: String?
     var textOverflowElementId: String?
     var outOfBoundsElementId: String?
+    var clippedGeometryElementId: String?
+    var clipContainerElementId: String?
+    var tableClipRiskElementId: String?
+    var layoutManagedObjectElementId: String?
     var overlapElementId: String?
     var runtimeRiskElementId: String?
     var pptxEffectRiskElementId: String?
@@ -399,12 +456,21 @@ struct HTMLDiagnostics: Codable, Equatable {
         exportArtifactCount: 0,
         textOverflowCount: 0,
         outOfBoundsCount: 0,
+        clippedGeometryCount: 0,
+        clipContainerCount: 0,
+        clippedContentCount: 0,
+        tableClipRiskCount: 0,
+        layoutManagedObjectCount: 0,
         overlapCount: 0,
         resourceElementId: nil,
         tableElementId: nil,
         svgElementId: nil,
         textOverflowElementId: nil,
         outOfBoundsElementId: nil,
+        clippedGeometryElementId: nil,
+        clipContainerElementId: nil,
+        tableClipRiskElementId: nil,
+        layoutManagedObjectElementId: nil,
         overlapElementId: nil,
         runtimeRiskElementId: nil,
         pptxEffectRiskElementId: nil,
@@ -424,6 +490,7 @@ struct HTMLDiagnostics: Codable, Equatable {
         if !cleanExport { count += 1 }
         count += textOverflowCount ?? 0
         count += outOfBoundsCount ?? 0
+        count += clippedGeometryCount ?? 0
         count += overlapCount ?? 0
         return count
     }
@@ -436,6 +503,7 @@ struct HTMLDiagnostics: Codable, Equatable {
         if (pptxEffectRiskCount ?? 0) > 0 { count += 1 }
         if (visualChangeCount ?? 0) > 0 { count += 1 }
         if (responsiveChangeCount ?? 0) > 0 { count += 1 }
+        if precisionEditingRiskCount > 0 { count += 1 }
         return count
     }
 
@@ -453,6 +521,37 @@ struct HTMLDiagnostics: Codable, Equatable {
         }
         return "The exported content still contains editor-only markers that need attention first."
     }
+
+    var precisionEditingRiskCount: Int {
+        max(0, tableClipRiskCount ?? 0)
+            + max(0, clipContainerCount ?? 0)
+            + max(0, layoutManagedObjectCount ?? 0)
+    }
+
+    var precisionEditingRiskElementId: String? {
+        tableClipRiskElementId
+            ?? clipContainerElementId
+            ?? layoutManagedObjectElementId
+    }
+
+    var precisionEditingRiskDetail: String {
+        var parts: [String] = []
+        if (tableClipRiskCount ?? 0) > 0 {
+            parts.append("\(tableClipRiskCount ?? 0) tables have clipping or scrolling boundaries")
+        }
+        if (clippedContentCount ?? 0) > 0 {
+            parts.append("\(clippedContentCount ?? 0) containers have overflowing content")
+        } else if (clipContainerCount ?? 0) > 0 {
+            parts.append("\(clipContainerCount ?? 0) clipping containers")
+        }
+        if (layoutManagedObjectCount ?? 0) > 0 {
+            parts.append("\(layoutManagedObjectCount ?? 0) layout-managed objects")
+        }
+        if parts.isEmpty {
+            return "No clear structural editing risk was detected."
+        }
+        return parts.joined(separator: ", ") + ". Check the parent container or complete group before moving objects."
+    }
 }
 
 struct HTMLDiagnosticIssue: Codable, Identifiable, Equatable {
@@ -462,6 +561,7 @@ struct HTMLDiagnosticIssue: Codable, Identifiable, Equatable {
     var title: String
     var detail: String
     var elementId: String?
+    var relatedElementId: String?
 }
 
 extension HTMLDiagnostics {

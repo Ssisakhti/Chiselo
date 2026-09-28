@@ -1,129 +1,114 @@
 # Chiselo
 
 [![CI](https://github.com/JunZhaoNathan/Chiselo/actions/workflows/ci.yml/badge.svg)](https://github.com/JunZhaoNathan/Chiselo/actions/workflows/ci.yml)
-[![Latest Release](https://img.shields.io/github/v/release/JunZhaoNathan/Chiselo?display_name=tag&label=latest)](https://github.com/JunZhaoNathan/Chiselo/releases/latest)
-[![License: Non-Commercial](https://img.shields.io/badge/license-non--commercial-orange)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/JunZhaoNathan/Chiselo?style=social)](https://github.com/JunZhaoNathan/Chiselo/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/JunZhaoNathan/Chiselo?display_name=tag&label=release)](https://github.com/JunZhaoNathan/Chiselo/releases/latest)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/license-CC--BY--NC--4.0-d97706.svg)](LICENSE)
+[![Platform: macOS](https://img.shields.io/badge/platform-macOS%2013%2B-111827)](docs/user/INSTALL.md)
+[![Website](https://img.shields.io/badge/website-chiselo.vellumloop.com-216b62)](https://chiselo.vellumloop.com/)
 
-**Chisel your HTML.**
+**Visual finishing for existing HTML.**
 
-Chiselo is a native macOS app for high-fidelity refinement and delivery of existing HTML files.
+Chiselo is a native macOS editor for the moment after an HTML page already
+exists. Open the original file, select what you see in the browser rendering,
+make a precise visual change, review it, and deliver the original format.
 
-Open an existing HTML page or document, refine its text, images, tables, modules, and layout the way you would polish a deliverable, then export clean HTML, high-fidelity PDF, or the most editable PPTX it can produce.
+![Chiselo editor home](docs/assets/chiselo-0.1.27-home.png)
 
-Chiselo starts from an existing HTML document. It is a finishing and delivery workflow, not a project authoring environment. The core promise is simple:
+Three-page workflow: open existing HTML, edit objects precisely, and deliver safely.
 
-**Bring in your HTML, refine it visually, preflight delivery, then export.**
+![Property inspector and single-object editing](docs/assets/chiselo-0.1.27-inspector.png)
 
-![Chiselo editor preview](assets/chiselo-editor-preview.png)
+![Stable text editing](docs/assets/chiselo-0.1.27-text-edit.png)
 
-## Download
+![Image replacement and display options](docs/assets/chiselo-0.1.27-image-replace.png)
 
-Current source and package version: `0.1.11`.
-
-Download the latest packaged DMG from GitHub Releases after each published build.
-
-- [Latest Release](https://github.com/JunZhaoNathan/Chiselo/releases/latest)
-- [0.1.11 Preview Notes](docs/releases/RELEASE_NOTES_0.1.11_PREVIEW.md)
-- [Release Guide](docs/dev/RELEASE.md)
-
-The preview build is ad-hoc signed and not notarized. If macOS blocks the first launch, the DMG includes `First Launch Help.txt` with step-by-step fixes for `Open Anyway`, Finder right-click `Open`, and quarantine removal.
+Chiselo edits existing HTML. It does not create website projects. When you edit
+one element, other elements keep their position and appearance. You can adjust
+text, images, tables, and styles for each object. During text entry, the
+selection box and canvas view remain locked. You can replace images with local
+files or embedded resources while keeping the original HTML delivery path.
 
 ## Why Chiselo
 
-- HTML stays the editable source document.
-- The browser-rendered page stays the source of truth.
-- Chiselo adds object-level visual finishing controls on top of the rendered document.
-- Delivery checks and exports focus on HTML/PDF/PPTX quality.
-- Dynamic and script-rendered HTML is handled as a compatibility case, not the product identity.
+| Work | Chiselo approach |
+| --- | --- |
+| Find the right object | Select the rendered DOM object instead of searching source first. |
+| Make a local correction | Edit text, images, tables, typography, color, spacing, geometry, and layers. |
+| Keep control of the source | Preserve untouched HTML byte-for-byte; write HTML and local CSS with rollback-capable saving. |
+| Review before delivery | Compare visual changes, inspect responsive widths, and run delivery checks. |
+| Deliver the right format | Save HTML, export high-fidelity PDF, or use best-effort editable PPTX. |
 
-## What You Can Do
+## Get Started
 
-- Open HTML documents and Chiselo project files (`.html`, `.htm`, `.xhtml`, `.aislide`, `.json`).
-- Drag HTML files into the app window or onto `Chiselo.app`.
-- Click directly on the rendered page to select visible objects.
-- Double-click text in place to edit it.
-- Drag, resize, align, nudge, duplicate, delete, and reorder elements.
-- Refine typography, colors, borders, radius, shadows, and image display modes from the visual Inspector.
-- Multi-select page objects with Shift/Cmd-click.
-- Replace images with embedded PNG/JPG/GIF/SVG/WebP data URLs.
-- Edit tables, including safer handling for `rowspan` and `colspan`.
-- Run a delivery check for broken resources, SVG usage, clean HTML export, text overflow, out-of-bounds elements, and overlaps.
-- Review object-level visual changes against the originally opened HTML before delivery.
-- Identify script-rendered HTML, embedded pages, canvas regions, external runtime resources, and transparent selection blockers before export.
-- Convert a live HTML rendering into a structured precision-editing tab.
-- Export clean standalone HTML, high-fidelity PDF, and best-effort editable PPTX.
+1. Download the signed macOS build from [Latest Release](https://github.com/JunZhaoNathan/Chiselo/releases/latest).
+2. Open an existing `.html`, `.htm`, or `.xhtml` file.
+3. Select a visible object, make the adjustment, then review the change before saving or exporting.
 
-## Typical Workflow
+Current release: `0.1.27` for Apple Silicon Macs. See the [installation guide](docs/user/INSTALL.md) and [usage guide](docs/user/USAGE.md).
 
-1. Open Chiselo.
-2. Drag in an existing HTML file.
-3. Click a visible element on the page.
-4. Edit text, move layout, adjust objects, replace images, and fix tables.
-5. Run the delivery check.
-6. Export HTML, PDF, or PPTX.
+## Product Boundary
 
-User docs:
+Chiselo is designed for static pages, reports, dashboards, visual documents,
+and conventional HTML generated by people or other tools. It is not a website
+builder, hosting product, site manager, general-purpose IDE, or prompt-to-page
+generator.
 
-- [Install](docs/user/INSTALL.md)
-- [Usage Guide](docs/user/USAGE.md)
+Scripts, forms, remote resources, cross-origin embeds, animations, canvas, and
+framework runtimes are diagnosed as compatibility risks. Documents open in
+static-safe mode by default; dynamic compatibility requires an explicit trusted
+document choice. PDF and PPTX export retain the safe default unless that choice
+has already been made.
 
-## Product Status
+## Documentation
 
-Chiselo is an early preview. It already edits rendered HTML objects and saves changes back to HTML, but complex scripts, responsive layouts, pseudo-elements, animations, cross-origin resources, and perfect multi-format output are still active research areas.
-
-PDF remains the recommended final format when maximum fidelity matters.
-
-## Creator Note
-
-Chiselo's product scope is deliberately clear: make existing HTML pages and visual documents easier to refine, inspect, export, and hand off.
-
-If Chiselo helps you or you are interested in precise HTML editing and visual delivery workflows, please star the repository so more people can find the project.
-
-## Docs
-
-- [Documentation Index](docs/README.md)
-- [Developer Docs](docs/dev/architecture.md)
-- [Testing](docs/dev/TESTING.md)
-- [Roadmap](docs/dev/ROADMAP.md)
-- [Changelog](docs/dev/CHANGELOG.md)
+- [Product strategy](docs/product/PRODUCT_STRATEGY.md): scope, primary workflow, and maintenance rules.
+- [Install](docs/user/INSTALL.md) and [usage](docs/user/USAGE.md): end-user guides.
+- [Architecture](docs/dev/architecture.md) and [testing](docs/dev/TESTING.md): how the app is built and verified.
+- [Roadmap](docs/dev/ROADMAP.md) and [changelog](docs/dev/CHANGELOG.md): what is next and what changed.
+- [Release notes](docs/releases/RELEASE_NOTES_0.1.27_PREVIEW.md): current packaged build details.
 
 ## Build From Source
 
-Requirements:
-
-- macOS 13 or newer
-- Xcode command line tools
-- Swift 5.9 or newer
-- Node.js for helper scripts
+Requirements: macOS 13+, Xcode command-line tools, Swift 5.9+, and Node.js for
+the helper scripts.
 
 ```bash
 swift run Chiselo
 ```
 
-`Package.swift` is the Swift Package manifest. It tells `swift build` what the app target is, where the source lives, and which resources should be bundled, so it needs to stay at the repository root.
+For the complete quality gate:
 
-## Repository Layout
-
-```text
-Chiselo/                  macOS SwiftUI app and exporter
-assets/                   screenshots and repository media
-config/                   design and packaging configuration
-docs/                     user docs, developer docs, and release notes
-examples/                 sample Chiselo project and HTML fixtures
-scripts/                  QA, export, icon, demo, and packaging scripts
+```bash
+scripts/release-preflight.sh
 ```
 
-## License
+## Project Layout
 
-Chiselo is source-available for personal, educational, research, evaluation, and non-commercial use only.
-
-Commercial use is not allowed. See [LICENSE](LICENSE).
+```text
+Chiselo/       Native macOS app, document lifecycle, editor bridge, exporters
+assets/        Repository media
+docs/          Product, user, developer, and release documentation
+examples/      Public HTML and project fixtures
+scripts/       Regression, export, packaging, and release checks
+```
 
 ## Contributing
 
-Personal-use contributions are welcome under the same non-commercial license.
+Small, testable contributions are welcome. Start with the
+[contributing guide](.github/CONTRIBUTING.md), then use the structured issue
+forms for bugs and feature requests. Please include a minimal HTML file or
+before/after export whenever it is safe to share.
 
-- [Contributing Guide](.github/CONTRIBUTING.md)
-- [Security Policy](.github/SECURITY.md)
-- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
+## License And Brand
+
+The source is publicly available under [CC BY-NC 4.0](LICENSE): copying,
+modification, and sharing are permitted for non-commercial purposes with
+attribution. Commercial use requires prior written permission. This is not an
+OSI-approved open-source license. For commercial licensing, contact
+[support@vellumloop.com](mailto:support@vellumloop.com).
+
+The Chiselo name, icon, `Chisel your HTML.` tagline, and Vellumloop branding do
+not transfer with the code. Forks and hosted services must use a distinct
+identity; see the [Trademark Policy](TRADEMARKS.md).
+
+Chiselo is made by [Vellumloop](https://vellumloop.com/).

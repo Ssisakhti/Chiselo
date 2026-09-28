@@ -46,7 +46,7 @@ This avoids local machines where `~/.config` has incorrect permissions.
 Before a bigger public release, run the full preflight:
 
 ```bash
-FULL_PREFLIGHT=1 scripts/push-github-update.sh "Prepare 0.1.11 preview"
+FULL_PREFLIGHT=1 scripts/push-github-update.sh "Prepare 0.1.26 release"
 ```
 
 This runs `scripts/release-preflight.sh` before committing.
@@ -93,6 +93,8 @@ git push -u origin main
 
 - Do not commit `outputs/`, `.build/`, `.app`, or `.dmg` files.
 - Upload DMG files through GitHub Releases, not normal git commits.
-- Keep the license language clear: source-available non-commercial; commercial use is forbidden.
-- Do not call the project OSI open source, because the license restricts commercial use.
+- Keep the license language clear: CC BY-NC 4.0 source-available, with a
+  separate Chiselo Trademark Policy.
+- Describe forks accurately: they may use the code, but may not present a
+  modified or commercial product as official Chiselo without permission.
 - If Git asks for credentials, use GitHub browser login, GitHub Desktop, or a Personal Access Token. Do not paste a GitHub password into random prompts.

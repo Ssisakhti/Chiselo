@@ -13,6 +13,7 @@
 
   const SNAP_DISTANCE = 6;
   const MIN_SIZE = 24;
+  const DIRECT_DRAG_START_DISTANCE = 4;
   const MIN_USER_ZOOM = 0.2;
   const MAX_USER_ZOOM = 6;
   const MAX_HTML_TREE_NODES = 260;
@@ -20,6 +21,9 @@
   const MAX_HTML_DIAGNOSTIC_ISSUES = 12;
   const MAX_VISUAL_CHANGE_PREVIEW_ITEMS = 48;
   const MAX_VISUAL_REVERT_TEXT_LENGTH = 10000;
+  const MAX_VISUAL_SNAPSHOT_HTML_LENGTH = 12000;
+  const MAX_VISUAL_SNAPSHOT_DESCENDANTS = 80;
+  const MAX_SOURCE_SNIPPET_DESCENDANTS = 160;
   const DIRECT_FIXED_FRAME_SELECTOR = ".slide,.sheet,.page,[data-slide],[data-page],[role='doc-page'],[aria-roledescription='slide'],[class~='slide'],[class^='slide-'],[class*=' slide-'],[class~='page'],[class^='page-'],[class*=' page-'],[id^='slide'],[id*='-slide'],[id^='page'],[id*='-page']";
   const CAPTURE_PAGE_SELECTOR = DIRECT_FIXED_FRAME_SELECTOR;
   const DIRECT_RUNTIME_ROOT_SELECTOR = "#app,#root,#__next,#__nuxt,[data-reactroot],[data-v-app],[ng-version]";
@@ -29,7 +33,9 @@
   const DIRECT_FORMATTING_INLINE_SELECTOR = "strong,em,b,i,u,small,code,mark,time,sub,sup";
   const DIRECT_TEXT_INLINE_SELECTOR = `${DIRECT_SAFE_INLINE_SELECTOR},${DIRECT_FORMATTING_INLINE_SELECTOR}`;
   const DIRECT_TEXT_SELECTOR = `${DIRECT_TEXT_BLOCK_SELECTOR},${DIRECT_TEXT_INLINE_SELECTOR},div,section,article,header,footer,aside`;
+  const DIRECT_NON_EDITABLE_TAGS = new Set(["script", "style", "meta", "link", "base", "title", "noscript", "template"]);
   const DIRECT_EDIT_MISSING_ATTR = "__chiselo_missing__";
+  const DIRECT_IMAGE_REFERENCE_PATTERN = /(?:^|[\s"'(])(?:[\w~@.-]+\/)*[\w@.-]+\.(?:png|jpe?g|webp|gif|svg|avif|heic|pdf)(?:[\s"')]|$)/i;
   const DIRECT_EDIT_STYLE_VARS = [
     "--chiselo-edit-font-family",
     "--chiselo-edit-font-size",
@@ -38,6 +44,10 @@
     "--chiselo-edit-letter-spacing",
     "--chiselo-edit-color"
   ];
+  const DIRECT_PSEUDO_ATTR_HOVER = "data-chiselo-force-hover";
+  const DIRECT_PSEUDO_ATTR_FOCUS = "data-chiselo-force-focus";
+  const DIRECT_PSEUDO_ATTR_FOCUS_VISIBLE = "data-chiselo-force-focus-visible";
+  const DIRECT_PSEUDO_ATTR_FOCUS_WITHIN = "data-chiselo-force-focus-within";
   const DIRECT_STYLESHEET_STYLE_KEYS = new Set([
     "fontFamily",
     "fontSize",
@@ -52,6 +62,25 @@
     "shadow",
     "objectFit"
   ]);
+  const DIRECT_LOCAL_FRAME_STYLE_KEYS = new Set([
+    "fontFamily",
+    "fontSize",
+    "fontWeight",
+    "lineHeight",
+    "letterSpacing",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "strokeWidth",
+    "display",
+    "flexDirection",
+    "justifyContent",
+    "alignItems",
+    "gap",
+    "flexWrap",
+    "whiteSpace"
+  ]);
 
   let deck = sampleDeck();
   let editorMode = "deck";
@@ -63,13 +92,22 @@
   let directSelectedNodes = [];
   let directHadDoctype = true;
   let directBaseHref = "";
+  let directCanvasSize = null;
+  let directPreviewWidth = null;
+  let directPreviewRenderFrame = 0;
   let directLayoutMode = "transform";
   let pendingDirectTextEditNode = null;
   let activeDirectTextEditNode = null;
+  let activeDirectTextEditFinish = null;
+  // Text editing keeps the current canvas and selection geometry stable until
+  // the edit is committed. Reflow is settled once when editing ends.
+  let directTextEditSelectionRect = null;
   let htmlTreeTimer = null;
   let htmlTreeIdleId = null;
   let htmlDiagnosticsTimer = null;
+  let htmlDiagnosticsIdleId = null;
   let directLayoutTimer = null;
+  let suppressDirectMutationRefresh = false;
   let directMutationRefreshPending = false;
   let directTreeRefreshPending = false;
   let directHoverFrame = 0;
@@ -82,17 +120,55 @@
   let htmlTreeTextCache = null;
   let selectionBridgeTimer = null;
   let selectionBoxFrame = 0;
+  let directSelectionPayloadCache = null;
+  let directSelectionPayloadCacheSignature = "";
   let pendingSelectionPayload = null;
+  let directPseudoPreviewState = "none";
   let scale = 1;
   let fitScale = 1;
   let userZoom = 1;
   let activeGesture = null;
+  let gestureListenerTargets = [];
+  let gesturePointerCaptureTarget = null;
+  let gesturePointerId = null;
   let historyPast = [];
   let historyFuture = [];
   let historyCoalesceKey = null;
   let historyCoalesceUntil = 0;
   let suppressHistory = false;
   let documentDirtyPosted = false;
+  let directRuntimeMode = "safe";
+  let directOriginalSource = "";
+  let directDocumentModified = false;
+  const editorGeometry = window.ChiseloEditorGeometry.create({
+    minSize: MIN_SIZE,
+    snapDistance: SNAP_DISTANCE
+  });
+  const {
+    clampNumber,
+    resizeRect,
+    bestSnap,
+    snapNumber,
+    distanceToRect,
+    formatTransformNumber,
+    rectChanged: directRectChanged,
+    elementArea,
+    roundedRect,
+    rectOverflowAmount,
+    rectIntersection,
+    rectArea
+  } = editorGeometry;
+  const directSourceMapping = window.ChiseloSourceMapping.create({
+    directSourceNodeIsVisible,
+    normalizedClassList,
+    normalizedText,
+    directNodeToken
+  });
+  const visualChangeLogic = window.ChiseloVisualChange.create({
+    visualStylesheetRuleDiffers,
+    truncateDiagnosticText,
+    maxRevertTextLength: MAX_VISUAL_REVERT_TEXT_LENGTH
+  });
 
   function sampleDeck() {
     return {
@@ -407,6 +483,9 @@
   }
 
   function postSelectionChanged(options = {}) {
+    if (editorMode === "html" && directPseudoPreviewState !== "none") {
+      applyDirectPseudoPreviewState();
+    }
     pendingSelectionPayload = options.payload || null;
 
     if (options.immediate) {
@@ -440,12 +519,16 @@
     postMessage("historyChanged", historyState());
   }
 
-  function postHTMLTreeChanged() {
+  function postHTMLTreeChanged(options = {}) {
     if (editorMode !== "html") return;
     const tree = buildHTMLTree();
     const signature = JSON.stringify(tree);
     if (signature === lastHTMLTreeSignature) return;
     lastHTMLTreeSignature = signature;
+    if (options.includeDiagnostics === false) {
+      postMessage("htmlTreeChanged", { tree });
+      return;
+    }
     const diagnostics = getImportDiagnostics();
     lastHTMLDiagnosticsSignature = JSON.stringify(diagnostics);
     postMessage("htmlTreeChanged", { tree, diagnostics });
@@ -460,44 +543,98 @@
     postMessage("htmlDiagnosticsChanged", { diagnostics });
   }
 
-  function scheduleHTMLTreeChanged() {
+  function scheduleHTMLTreeChanged(options = {}) {
     if (editorMode !== "html") return;
     clearTimeout(htmlTreeTimer);
     if (htmlTreeIdleId && window.cancelIdleCallback) {
       window.cancelIdleCallback(htmlTreeIdleId);
       htmlTreeIdleId = null;
     }
+    const delay = Number.isFinite(options.delay) ? options.delay : 140;
     htmlTreeTimer = setTimeout(() => {
       if (window.requestIdleCallback) {
         htmlTreeIdleId = window.requestIdleCallback(() => {
           htmlTreeIdleId = null;
-          postHTMLTreeChanged();
+          postHTMLTreeChanged(options);
         }, { timeout: 500 });
       } else {
-        postHTMLTreeChanged();
+        postHTMLTreeChanged(options);
       }
-    }, 140);
+    }, delay);
   }
 
-  function scheduleHTMLDiagnosticsChanged() {
+  function scheduleHTMLDiagnosticsChanged(options = {}) {
     if (editorMode !== "html") return;
     clearTimeout(htmlDiagnosticsTimer);
+    if (htmlDiagnosticsIdleId && window.cancelIdleCallback) {
+      window.cancelIdleCallback(htmlDiagnosticsIdleId);
+      htmlDiagnosticsIdleId = null;
+    }
+    const delay = Number.isFinite(options.delay) ? options.delay : 320;
+    const idleTimeout = Number.isFinite(options.idleTimeout) ? options.idleTimeout : 1000;
     htmlDiagnosticsTimer = setTimeout(() => {
       htmlDiagnosticsTimer = null;
-      postHTMLDiagnosticsChanged();
-    }, 120);
+      if (window.requestIdleCallback) {
+        htmlDiagnosticsIdleId = window.requestIdleCallback(() => {
+          htmlDiagnosticsIdleId = null;
+          postHTMLDiagnosticsChanged();
+        }, { timeout: idleTimeout });
+      } else {
+        postHTMLDiagnosticsChanged();
+      }
+    }, delay);
   }
 
   function scheduleDirectLayoutRefresh() {
     if (editorMode !== "html") return;
+    if (activeDirectTextEditNode?.isConnected) {
+      clearTimeout(directLayoutTimer);
+      directLayoutTimer = null;
+      return;
+    }
     clearTimeout(directLayoutTimer);
-    const delay = activeDirectTextEditNode?.isConnected ? 96 : 40;
+    const delay = 40;
     directLayoutTimer = setTimeout(() => {
       collapseDirectQuickActions();
       fitStage({ preserveScale: true });
       updatePageBoundaryOverlay();
       updateSelectionBox();
     }, delay);
+  }
+
+  function cancelDirectDeferredWork() {
+    clearTimeout(htmlTreeTimer);
+    htmlTreeTimer = null;
+    if (htmlTreeIdleId && window.cancelIdleCallback) {
+      window.cancelIdleCallback(htmlTreeIdleId);
+    }
+    htmlTreeIdleId = null;
+
+    clearTimeout(htmlDiagnosticsTimer);
+    htmlDiagnosticsTimer = null;
+    if (htmlDiagnosticsIdleId && window.cancelIdleCallback) {
+      window.cancelIdleCallback(htmlDiagnosticsIdleId);
+    }
+    htmlDiagnosticsIdleId = null;
+
+    clearTimeout(directLayoutTimer);
+    directLayoutTimer = null;
+    directTextEditSelectionRect = null;
+    clearTimeout(directVisualBaselineTimer);
+    directVisualBaselineTimer = null;
+    clearTimeout(selectionBridgeTimer);
+    selectionBridgeTimer = null;
+
+    if (selectionBoxFrame) cancelAnimationFrame(selectionBoxFrame);
+    selectionBoxFrame = 0;
+    if (directPreviewRenderFrame) cancelAnimationFrame(directPreviewRenderFrame);
+    directPreviewRenderFrame = 0;
+    if (directHoverFrame) cancelAnimationFrame(directHoverFrame);
+    directHoverFrame = 0;
+
+    pendingSelectionPayload = null;
+    pendingDirectHoverNode = null;
+    clearDirectSelectionPayloadCache();
   }
 
   function mutationsAffectHTMLTree(mutations) {
@@ -519,6 +656,17 @@
     }
 
     return false;
+  }
+
+  function withSuppressedDirectMutationRefresh(callback) {
+    suppressDirectMutationRefresh = true;
+    try {
+      return callback();
+    } finally {
+      setTimeout(() => {
+        suppressDirectMutationRefresh = false;
+      }, 0);
+    }
   }
 
   function scheduleSelectionBoxUpdate() {
@@ -549,6 +697,7 @@
     historyCoalesceKey = key;
     historyCoalesceUntil = key ? now + interval : 0;
     historyPast.push({ snapshot: currentSnapshot(), label });
+    directDocumentModified = true;
     if (historyPast.length > 100) historyPast.shift();
     historyFuture = [];
     postHistoryChanged();
@@ -592,9 +741,20 @@
     documentDirtyPosted = false;
   }
 
+  function markSavedFromBase64(base64) {
+    directOriginalSource = decodeBase64(base64);
+    directDocumentModified = false;
+    clearDirty();
+  }
+
   function currentSnapshot() {
     if (editorMode === "html") {
-      return JSON.stringify({ mode: "html", html: exportDirectHTML(), baseHref: directBaseHref });
+      return JSON.stringify({
+        mode: "html",
+        html: exportDirectHTML(),
+        baseHref: directBaseHref,
+        documentModified: directDocumentModified
+      });
     }
 
     return JSON.stringify({ mode: "deck", deck });
@@ -606,7 +766,15 @@
     const parsed = JSON.parse(snapshot);
 
     if (parsed.mode === "html") {
-      await loadDirectHTML(parsed.html, parsed.baseHref || directBaseHref, { resetView: false, preserveDirty: true, preserveBaseline: true, preserveHistory: true });
+      await loadDirectHTML(parsed.html, parsed.baseHref || directBaseHref, {
+        resetView: false,
+        preserveDirty: true,
+        preserveBaseline: true,
+        preserveHistory: true,
+        preserveCanvasSize: true,
+        preserveOriginalSource: true,
+        documentModified: Boolean(parsed.documentModified)
+      });
     } else {
       deck = parsed.deck || parsed;
       editorMode = "deck";
@@ -620,6 +788,10 @@
     }
 
     suppressHistory = false;
+    if (editorMode === "html" && !directDocumentModified) {
+      clearDirty();
+      postMessage("documentClean");
+    }
     postHistoryChanged();
   }
 
@@ -629,8 +801,8 @@
     const entry = historyPast.pop();
     historyFuture.push({ snapshot: currentSnapshot(), label: historyEntryLabel(entry) });
     markDocumentDirty();
-    void restoreFromSnapshot(historyEntrySnapshot(entry));
     postHistoryChanged();
+    return restoreFromSnapshot(historyEntrySnapshot(entry));
   }
 
   function redo() {
@@ -639,19 +811,23 @@
     const entry = historyFuture.pop();
     historyPast.push({ snapshot: currentSnapshot(), label: historyEntryLabel(entry) });
     markDocumentDirty();
-    void restoreFromSnapshot(historyEntrySnapshot(entry));
     postHistoryChanged();
+    return restoreFromSnapshot(historyEntrySnapshot(entry));
   }
 
   function fitStage(options = {}) {
     const canvas = editorMode === "html" ? directCanvas() : deck.canvas;
+    const responsivePreviewBorder = editorMode === "html" && directPreviewWidth ? 2 : 0;
     const bounds = viewport.getBoundingClientRect();
     const pad = 68;
     const previousScale = scale;
     const fitX = Math.max(0.1, (bounds.width - pad) / canvas.width);
     const fitY = Math.max(0.1, (bounds.height - pad) / canvas.height);
+    // An imported HTML document is a CSS-pixel document, not a slide. Never
+    // resize it to follow the editor window: only an explicit zoom action may
+    // change its scale. Overflow is intentionally handled by the viewport.
     fitScale = editorMode === "html"
-      ? Math.min(fitX, 1.35)
+      ? 1
       : Math.min(fitX, fitY, 1.35);
     if (options.preserveScale && Number.isFinite(previousScale) && previousScale > 0) {
       scale = clampNumber(previousScale, 0.05, 8);
@@ -663,22 +839,33 @@
     stage.style.width = `${canvas.width}px`;
     stage.style.height = `${canvas.height}px`;
     stage.style.transform = `scale(${scale})`;
-    stageOuter.style.width = `${canvas.width * scale}px`;
-    stageOuter.style.height = `${canvas.height * scale}px`;
+    stageOuter.style.width = `${(canvas.width + responsivePreviewBorder) * scale}px`;
+    stageOuter.style.height = `${(canvas.height + responsivePreviewBorder) * scale}px`;
     applyOverlayScaleVariables();
-    const overflowsX = canvas.width * scale + pad > bounds.width;
-    const overflowsY = canvas.height * scale + pad > bounds.height;
+    const overflowsX = (canvas.width + responsivePreviewBorder) * scale + pad > bounds.width;
+    const overflowsY = (canvas.height + responsivePreviewBorder) * scale + pad > bounds.height;
     viewport.classList.toggle("is-scrollable", overflowsX || overflowsY);
     viewport.classList.toggle("is-overflow-x", overflowsX);
     viewport.classList.toggle("is-overflow-y", overflowsY);
   }
 
-  function clampNumber(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
   function resetZoom() {
     userZoom = 1;
+  }
+
+  function setHTMLZoomPreset(preset) {
+    if (editorMode !== "html") return null;
+
+    const canvas = directCanvas();
+    if (preset === "fit-width") {
+      const bounds = viewport.getBoundingClientRect();
+      userZoom = clampNumber(Math.max(0.1, (bounds.width - 68) / canvas.width), MIN_USER_ZOOM, MAX_USER_ZOOM);
+    } else {
+      userZoom = 1;
+    }
+    fitStage();
+    updateSelectionBox();
+    return { scale, fitScale, userZoom };
   }
 
   function applyOverlayScaleVariables() {
@@ -737,12 +924,65 @@
   }
 
   function directCanvas() {
+    const measured = measureDirectCanvas();
+    if (!directCanvasSize) directCanvasSize = measured;
+    return directCanvasSize;
+  }
+
+  function measureDirectCanvas() {
     const doc = directFrame?.contentDocument;
     const root = doc?.documentElement;
     const body = doc?.body;
-    const width = Math.max(640, root?.scrollWidth || 0, body?.scrollWidth || 0, directFrame?.offsetWidth || 0);
-    const height = Math.max(360, root?.scrollHeight || 0, body?.scrollHeight || 0, directFrame?.offsetHeight || 0);
+    const contentBounds = directTopLevelContentBounds(doc);
+    const bodyRect = body?.getBoundingClientRect?.();
+    const rootRect = root?.getBoundingClientRect?.();
+    const width = directPreviewWidth || Math.max(
+      640,
+      contentBounds.width || 0,
+      body?.scrollWidth && !contentBounds.width ? body.scrollWidth : 0,
+      root?.scrollWidth && !contentBounds.width ? root.scrollWidth : 0,
+      bodyRect?.width && !contentBounds.width ? bodyRect.width : 0,
+      rootRect?.width && !contentBounds.width ? rootRect.width : 0,
+      directFrame?.offsetWidth || 0
+    );
+    const height = Math.max(
+      360,
+      contentBounds.height || 0,
+      body?.scrollHeight && !contentBounds.height ? body.scrollHeight : 0,
+      root?.scrollHeight && !contentBounds.height ? root.scrollHeight : 0,
+      bodyRect?.height && !contentBounds.height ? bodyRect.height : 0,
+      rootRect?.height && !contentBounds.height ? rootRect.height : 0,
+      directFrame?.offsetHeight || 0
+    );
     return { width: Math.ceil(width), height: Math.ceil(height), background: "#ffffff" };
+  }
+
+  function directTopLevelContentBounds(doc) {
+    if (!doc?.body) return { width: 0, height: 0 };
+    const win = doc.defaultView;
+    let width = 0;
+    let bottom = 0;
+
+    for (const node of doc.body.children || []) {
+      if (!node || node.nodeType !== Node.ELEMENT_NODE) continue;
+      const tag = node.tagName?.toLowerCase?.() || "";
+      if (["script", "style", "meta", "link", "base", "title", "noscript"].includes(tag)) continue;
+      if (node.hasAttribute?.("data-chiselo-style")) continue;
+      const style = win.getComputedStyle(node);
+      if (!isVisibleStyle(style)) continue;
+      if (style.position === "fixed") continue;
+      const rect = node.getBoundingClientRect();
+      if (rect.width <= 1 && rect.height <= 1) continue;
+      const marginX = (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0);
+      const marginBottom = parseFloat(style.marginBottom) || 0;
+      width = Math.max(width, rect.width + marginX);
+      bottom = Math.max(bottom, rect.bottom + (win.scrollY || 0) + marginBottom);
+    }
+
+    return {
+      width: Math.ceil(width),
+      height: Math.ceil(bottom)
+    };
   }
 
   function render() {
@@ -770,6 +1010,7 @@
 
   function renderDirectHTML(options = {}) {
     stage.classList.add("is-html-document");
+    stage.classList.toggle("is-responsive-preview", Boolean(directPreviewWidth));
     fitStage({ preserveScale: Boolean(options.preserveScale) });
     surface.style.background = "#ffffff";
     layer.innerHTML = "";
@@ -953,6 +1194,7 @@
 
   function clearSelection() {
     if (editorMode === "html") {
+      finishActiveDirectTextEdit({ defer: false });
       directSelectedNode = null;
       directSelectedNodes = [];
       selectedId = null;
@@ -1009,13 +1251,7 @@
         selectionPayloadBase: deckGroupSelectionBase(dragGroupId)
       };
 
-      try {
-        event.currentTarget.setPointerCapture?.(event.pointerId);
-      } catch {
-        // Synthetic pointer events and some WebKit edge cases can reject capture.
-      }
-      document.addEventListener("pointermove", continueGesture);
-      document.addEventListener("pointerup", endGesture, { once: true });
+      startGestureListeners(event, document);
       return;
     }
 
@@ -1030,13 +1266,7 @@
       selectionPayloadBase: clone(element)
     };
 
-    try {
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-    } catch {
-      // Synthetic pointer events and some WebKit edge cases can reject capture.
-    }
-    document.addEventListener("pointermove", continueGesture);
-    document.addEventListener("pointerup", endGesture, { once: true });
+    startGestureListeners(event, document);
   }
 
   function beginResize(event, handle) {
@@ -1067,8 +1297,7 @@
       ratio: element.w / element.h
     };
 
-    document.addEventListener("pointermove", continueGesture);
-    document.addEventListener("pointerup", endGesture, { once: true });
+    startGestureListeners(event, document);
   }
 
   function continueGesture(event) {
@@ -1133,26 +1362,118 @@
     postSelectionChanged();
   }
 
-  function endGesture() {
-    if (!activeGesture) return;
+  function startGestureListeners(event, ...targets) {
+    stopGestureListeners();
+
+    gesturePointerId = event?.pointerId ?? null;
+    gesturePointerCaptureTarget = activeGesture?.mode === "html" ? null : pointerCaptureTarget(event);
+    try {
+      if (gesturePointerCaptureTarget && gesturePointerId !== null) {
+        gesturePointerCaptureTarget.setPointerCapture?.(gesturePointerId);
+      }
+    } catch {
+      // Synthetic pointer events and some WebKit edge cases can reject capture.
+    }
+
+    for (const target of targets) {
+      addGestureListenerTarget(target);
+    }
+
+    window.addEventListener("blur", endGesture);
+    directFrame?.contentWindow?.addEventListener("blur", endGesture);
+  }
+
+  function pointerCaptureTarget(event) {
+    if (event?.target?.setPointerCapture) return event.target;
+    if (event?.currentTarget?.setPointerCapture) return event.currentTarget;
+    return null;
+  }
+
+  function addGestureListenerTarget(target) {
+    if (!target || gestureListenerTargets.includes(target)) return;
+    target.addEventListener("pointermove", continueGesture);
+    target.addEventListener("pointerup", endGesture);
+    target.addEventListener("pointercancel", endGesture);
+    target.addEventListener("mouseup", endGesture);
+    gestureListenerTargets.push(target);
+  }
+
+  function stopGestureListeners(options = {}) {
+    for (const target of gestureListenerTargets) {
+      target.removeEventListener("pointermove", continueGesture);
+      target.removeEventListener("pointerup", endGesture);
+      target.removeEventListener("pointercancel", endGesture);
+      target.removeEventListener("mouseup", endGesture);
+    }
+    gestureListenerTargets = [];
+
+    window.removeEventListener("blur", endGesture);
+    directFrame?.contentWindow?.removeEventListener("blur", endGesture);
+
+    try {
+      if (options.releasePointerCapture !== false && gesturePointerCaptureTarget && gesturePointerId !== null) {
+        gesturePointerCaptureTarget.releasePointerCapture?.(gesturePointerId);
+      }
+    } catch {
+      // Capture may already be gone after a cancel or cross-document release.
+    }
+
+    gesturePointerCaptureTarget = null;
+    gesturePointerId = null;
+  }
+
+  function endGesture(event = null) {
+    const shouldReleasePointerCapture = event?.type !== "pointerup" && event?.type !== "pointercancel";
+    if (!activeGesture) {
+      stopGestureListeners({ releasePointerCapture: shouldReleasePointerCapture });
+      hideGuides();
+      return;
+    }
     const wasDirect = activeGesture.mode === "html";
+    const directGestureHandledOwnLayout = wasDirect && activeGesture.handledOwnLayout;
+    const finalSelectionPayload = directFinalGestureSelectionPayload(activeGesture);
     activeGesture = null;
+    stopGestureListeners({ releasePointerCapture: shouldReleasePointerCapture });
     hideGuides();
     if (!wasDirect) postDeckChanged();
     if (wasDirect && directMutationRefreshPending) {
       directMutationRefreshPending = false;
-      scheduleDirectLayoutRefresh();
+      if (directGestureHandledOwnLayout) {
+        updatePageBoundaryOverlay();
+      } else {
+        scheduleDirectLayoutRefresh();
+      }
       if (directTreeRefreshPending) {
         directTreeRefreshPending = false;
         scheduleHTMLTreeChanged();
       }
     }
+    if (selectionBoxFrame) {
+      cancelAnimationFrame(selectionBoxFrame);
+      selectionBoxFrame = 0;
+    }
     updateSelectionBox();
-    postSelectionChanged({ immediate: true });
-    document.removeEventListener("pointermove", continueGesture);
+    postSelectionChanged({ immediate: true, payload: finalSelectionPayload });
+  }
 
-    const doc = directFrame?.contentDocument;
-    doc?.removeEventListener("pointermove", continueGesture);
+  function directFinalGestureSelectionPayload(gesture) {
+    if (gesture?.mode !== "html" || !gesture.selectionPayloadBase || !gesture.lastRect) return null;
+    const element = {
+      ...gesture.selectionPayloadBase,
+      x: gesture.lastRect.x,
+      y: gesture.lastRect.y,
+      w: gesture.lastRect.w,
+      h: gesture.lastRect.h
+    };
+    const nodes = (gesture.nodes || []).filter((node) => node?.isConnected);
+    if (gesture.node?.isConnected && nodes.length <= 1) {
+      cacheDirectSelectionPayload(gesture.node, element);
+    }
+    return {
+      element,
+      slideIndex: currentSlideIndex,
+      path: element.htmlPath || null
+    };
   }
 
   function rectOf(element) {
@@ -1279,45 +1600,6 @@
     return true;
   }
 
-  function resizeRect(rect, handle, dx, dy, ratio) {
-    let next = { ...rect };
-
-    if (handle.includes("e")) next.w = rect.w + dx;
-    if (handle.includes("s")) next.h = rect.h + dy;
-    if (handle.includes("w")) {
-      next.x = rect.x + dx;
-      next.w = rect.w - dx;
-    }
-    if (handle.includes("n")) {
-      next.y = rect.y + dy;
-      next.h = rect.h - dy;
-    }
-
-    if (ratio && handle.length === 2) {
-      if (Math.abs(dx) > Math.abs(dy)) {
-        const sign = handle.includes("n") ? -1 : 1;
-        next.h = Math.max(MIN_SIZE, next.w / ratio);
-        if (sign < 0) next.y = rect.y + rect.h - next.h;
-      } else {
-        const sign = handle.includes("w") ? -1 : 1;
-        next.w = Math.max(MIN_SIZE, next.h * ratio);
-        if (sign < 0) next.x = rect.x + rect.w - next.w;
-      }
-    }
-
-    if (next.w < MIN_SIZE) {
-      if (handle.includes("w")) next.x = rect.x + rect.w - MIN_SIZE;
-      next.w = MIN_SIZE;
-    }
-
-    if (next.h < MIN_SIZE) {
-      if (handle.includes("n")) next.y = rect.y + rect.h - MIN_SIZE;
-      next.h = MIN_SIZE;
-    }
-
-    return next;
-  }
-
   function snapRect(inputRect, activeId) {
     const rect = { ...inputRect };
     const guides = [];
@@ -1376,21 +1658,6 @@
     return { rect, guides };
   }
 
-  function bestSnap(edges, candidates) {
-    let best = null;
-
-    for (const edge of edges) {
-      for (const candidate of candidates) {
-        const distance = Math.abs(edge.value() - candidate.value);
-        if (distance <= SNAP_DISTANCE && (!best || distance < best.distance)) {
-          best = { edge, candidate, distance };
-        }
-      }
-    }
-
-    return best;
-  }
-
   function showGuides(guides) {
     guideLayer.innerHTML = "";
 
@@ -1440,7 +1707,7 @@
 
       const label = document.createElement("div");
       label.className = "page-boundary-label";
-      label.textContent = `${frame.label} · ${Math.round(rect.w)}×${Math.round(rect.h)}`;
+      label.textContent = boundaryLabelForFrame(frame, rect);
       boundary.appendChild(label);
 
       addBoundaryCenterLine(boundary, "x", rect.w / 2);
@@ -1456,6 +1723,15 @@
     if (axis === "x") line.style.left = `${Math.round(value)}px`;
     if (axis === "y") line.style.top = `${Math.round(value)}px`;
     boundary.appendChild(line);
+  }
+
+  function boundaryLabelForFrame(frame, rect) {
+    const width = Math.round(rect.w);
+    const height = Math.round(rect.h);
+    if (editorMode === "html") {
+      return `${frame.label === "Page" ? "Content Boundary" : frame.label} · ${width}×${height}`;
+    }
+    return `Canvas · ${width}×${height}`;
   }
 
   function addBoundaryTicks(boundary, rect) {
@@ -1569,11 +1845,9 @@
   function command(name) {
     switch (name) {
       case "undo":
-        undo();
-        return;
+        return undo();
       case "redo":
-        redo();
-        return;
+        return redo();
       case "delete":
         deleteSelected();
         return;
@@ -1682,11 +1956,29 @@
       case "selectSameClass":
         selectDirectSameClass();
         return;
+      case "selectTable":
+        selectDirectTable();
+        return;
       case "editText":
         if (editorMode === "html" && directSelectedNode) beginDirectTextEdit(directSelectedNode);
         return;
       case "clearSelection":
         clearSelection();
+        return;
+      case "insertDiv":
+        insertHTMLElement("div");
+        return;
+      case "insertParagraph":
+        insertHTMLElement("p");
+        return;
+      case "insertImage":
+        insertHTMLElement("img");
+        return;
+      case "insertLink":
+        insertHTMLElement("a");
+        return;
+      case "insertTable":
+        insertHTMLElement("table");
         return;
       case "setLayoutFree":
         setDirectLayoutMode("free");
@@ -1734,6 +2026,83 @@
         return;
       default:
         return;
+    }
+  }
+
+  function insertHTMLElement(kind) {
+    if (editorMode !== "html") return null;
+    const doc = directFrame?.contentDocument;
+    if (!doc?.body) return null;
+
+    const node = createInsertedHTMLElement(doc, kind);
+    if (!node) return null;
+
+    const selected = directSelectedNode?.isConnected ? directSelectedNode : null;
+    const selectedTag = selected?.tagName?.toLowerCase?.() || "";
+    const insertInside = selected && ["td", "th", "caption"].includes(selectedTag);
+    const parent = insertInside
+      ? selected
+      : (selected && selected !== doc.body && selected.parentElement ? selected.parentElement : doc.body);
+
+    pushHistory({ label: "Insert HTML element" });
+    withSuppressedDirectMutationRefresh(() => {
+      prepareDirectSubtree(node);
+      if (insertInside || !selected || selected === doc.body || selected.parentElement !== parent) {
+        parent.appendChild(node);
+      } else {
+        parent.insertBefore(node, selected.nextSibling);
+      }
+    });
+
+    selectDirectNode(node);
+    scheduleDirectLayoutRefresh();
+    scheduleHTMLTreeChanged();
+    scheduleHTMLDiagnosticsChanged();
+    postSelectionChanged({ immediate: true });
+    revealDirectNode(node, { immediate: true });
+    return selectedElement();
+  }
+
+  function createInsertedHTMLElement(doc, kind) {
+    switch (String(kind || "").toLowerCase()) {
+      case "div": {
+        const node = doc.createElement("div");
+        node.textContent = "New Section";
+        node.setAttribute("style", "padding:16px;min-height:56px;border:1px dashed #0a84ff;background:rgba(10,132,255,.08);color:#111827;");
+        return node;
+      }
+      case "p":
+      case "paragraph": {
+        const node = doc.createElement("p");
+        node.textContent = "New paragraph text";
+        node.setAttribute("style", "margin:12px 0;color:#111827;line-height:1.55;");
+        return node;
+      }
+      case "a":
+      case "link": {
+        const node = doc.createElement("a");
+        node.href = "#";
+        node.textContent = "New Link";
+        node.setAttribute("style", "color:#0a84ff;text-decoration:underline;");
+        return node;
+      }
+      case "img":
+      case "image": {
+        const node = doc.createElement("img");
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180"><rect width="320" height="180" rx="14" fill="#f3f6fb"/><path d="M54 126l58-54 44 36 34-30 76 68H54z" fill="#c7d2fe"/><circle cx="228" cy="58" r="18" fill="#93c5fd"/><text x="160" y="154" text-anchor="middle" font-family="Arial,sans-serif" font-size="15" font-weight="700" fill="#475569">Replace image</text></svg>`;
+        node.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        node.alt = "New image";
+        node.setAttribute("style", "display:block;width:320px;max-width:100%;height:auto;");
+        return node;
+      }
+      case "table": {
+        const table = doc.createElement("table");
+        table.setAttribute("style", "border-collapse:collapse;width:100%;max-width:520px;margin:12px 0;color:#111827;");
+        table.innerHTML = `<tbody><tr><td style="border:1px solid #d9e1e8;padding:10px;">Cell</td><td style="border:1px solid #d9e1e8;padding:10px;">Cell</td></tr><tr><td style="border:1px solid #d9e1e8;padding:10px;">Cell</td><td style="border:1px solid #d9e1e8;padding:10px;">Cell</td></tr></tbody>`;
+        return table;
+      }
+      default:
+        return null;
     }
   }
 
@@ -2026,10 +2395,6 @@
     postSelectionChanged();
   }
 
-  function snapNumber(value, grid) {
-    return Math.round(value / grid) * grid;
-  }
-
   function nudgeSelected(dx, dy) {
     if (editorMode === "html") {
       const nodes = directSelectionNodes();
@@ -2079,8 +2444,11 @@
 
     if (!directSelectedNode || !directSelectedNode.isConnected) return null;
 
+    const cached = cachedDirectSelectionPayload(directSelectedNode);
+    if (cached) return cached;
+
     const rect = directNodeRect(directSelectedNode);
-    return directElementPayloadForNode(directSelectedNode, rect);
+    return cacheDirectSelectionPayload(directSelectedNode, directElementPayloadForNode(directSelectedNode, rect));
   }
 
   function directSelectionPayloadBase(nodes, rect) {
@@ -2093,6 +2461,12 @@
         htmlPath: `${nodes.length} object(s) selected`,
         semanticRole: "selection-group",
         semanticLabel: "Multiple Objects",
+        editSafetyLevel: "caution",
+        editSafetyTitle: "Multiple Objects",
+        editSafetyDetail: "Before you move, align, or distribute the group, confirm that all objects belong to the same visual section. Objects in different containers can be affected by parent layout or clipping.",
+        editSafetyOperations: ["Move Group", "Align Group", "Distribute Spacing", "Review Separately"],
+        editSafetyTargetId: null,
+        editSafetyContainerId: null,
         layoutMode: directLayoutMode,
         x: rect.x,
         y: rect.y,
@@ -2115,6 +2489,11 @@
     const style = node.ownerDocument.defaultView.getComputedStyle(node);
     const semantic = directSemanticForNode(node);
     const frame = directElementFramePayload(node);
+    const image = selectedImageNodeFor(node);
+    const imageReference = !image && isImageReferenceNode(node);
+    const imageReferenceSource = imageReference ? directImageReferenceSource(node) : "";
+    const link = directLinkNodeForAttributes(node);
+    const editSafety = directEditSafetyForNode(node, { imageReference });
     const payloadStyle = {
       fontFamily: style.fontFamily || "-apple-system, BlinkMacSystemFont, sans-serif",
       fontSize: parseFloat(style.fontSize) || 16,
@@ -2129,7 +2508,37 @@
     };
     const shadow = shadowValue(style.boxShadow);
     if (shadow !== "none") payloadStyle.shadow = shadow;
-    if (node.matches?.("img")) payloadStyle.objectFit = objectFitValue(style.objectFit, "fill");
+    if (image) {
+      const imageStyle = image.ownerDocument.defaultView.getComputedStyle(image);
+      payloadStyle.objectFit = objectFitValue(imageStyle.objectFit, "fill");
+    }
+    // Box model
+    payloadStyle.paddingTop = parseFloat(style.paddingTop) || 0;
+    payloadStyle.paddingRight = parseFloat(style.paddingRight) || 0;
+    payloadStyle.paddingBottom = parseFloat(style.paddingBottom) || 0;
+    payloadStyle.paddingLeft = parseFloat(style.paddingLeft) || 0;
+    payloadStyle.marginTop = parseFloat(style.marginTop) || 0;
+    payloadStyle.marginRight = parseFloat(style.marginRight) || 0;
+    payloadStyle.marginBottom = parseFloat(style.marginBottom) || 0;
+    payloadStyle.marginLeft = parseFloat(style.marginLeft) || 0;
+    // Layout
+    payloadStyle.display = style.display || "block";
+    if (style.display.includes("flex") || style.display.includes("grid")) {
+      payloadStyle.flexDirection = style.flexDirection || "row";
+      payloadStyle.justifyContent = style.justifyContent || "normal";
+      payloadStyle.alignItems = style.alignItems || "normal";
+      payloadStyle.gap = parseFloat(style.gap) || 0;
+      payloadStyle.flexWrap = style.flexWrap || "nowrap";
+    }
+    // Position & misc
+    payloadStyle.position = style.position || "static";
+    payloadStyle.overflow = style.overflow || "visible";
+    payloadStyle.opacity = Math.round((parseFloat(style.opacity) || 1) * 100) / 100;
+    const ls = parseFloat(style.letterSpacing);
+    if (ls && Number.isFinite(ls)) payloadStyle.letterSpacing = Math.round(ls * 100) / 100;
+    if (style.textDecoration && style.textDecoration !== "none") payloadStyle.textDecoration = style.textDecoration;
+    if (style.textTransform && style.textTransform !== "none") payloadStyle.textTransform = style.textTransform;
+    if (style.whiteSpace && style.whiteSpace !== "normal") payloadStyle.whiteSpace = style.whiteSpace;
     Object.assign(payloadStyle, directStyleWritebackPreview(node));
     const sourceSnippet = directSourceSnippetForNode(node);
     const sourceAncestorItems = directSourceAncestorItemsForNode(node);
@@ -2141,6 +2550,10 @@
       type: "html",
       tagName: node.tagName.toLowerCase(),
       htmlPath: directNodePath(node),
+      className: node.getAttribute("class") || "",
+      inlineStyle: node.getAttribute("style") || "",
+      linkHref: link ? (link.getAttribute("href") || "") : null,
+      linkTarget: link ? (link.getAttribute("target") || "") : null,
       semanticRole: semantic.role,
       semanticLabel: semantic.label,
       sourceKind: "html-source",
@@ -2149,9 +2562,16 @@
       sourceAncestorItems,
       sourceSiblingItems,
       sourceChildItems,
-      layoutMode: directLayoutMode,
-      imageSource: node.matches?.("img") ? (node.currentSrc || node.getAttribute("src") || "") : null,
-      imageAlt: node.matches?.("img") ? (node.getAttribute("alt") || "") : null,
+      ...editSafety,
+      editability: imageReference ? "reference" : directGeometryLockedNode(node) ? "table-structure" : null,
+      captureNote: imageReference
+        ? imageReferenceSource
+          ? `This is an HTML image reference or placeholder (${imageReferenceSource}), not a replaceable <img> node. To replace the image, edit the source or insert a real image node.`
+          : "This is an HTML image icon or placeholder, not a replaceable <img> node. To replace the image, edit the source or insert a real image node."
+        : directGeometryLockReason(node),
+      layoutMode: directGeometryLockedNode(node) ? "table-cell" : directLayoutMode,
+      imageSource: image ? directImageSourceForPayload(image) : null,
+      imageAlt: image ? (image.getAttribute("alt") || "") : null,
       x: rect.x,
       y: rect.y,
       w: rect.w,
@@ -2177,25 +2597,40 @@
     };
   }
 
+  function directImageSourceForPayload(image) {
+    if (!image) return "";
+    const attrSource = image.getAttribute("src") || "";
+    if (attrSource.startsWith("data:")) return attrSource;
+    return image.currentSrc || attrSource;
+  }
+
   function updateDirectSelectionBox() {
     const nodes = directSelectionNodes();
     if (!nodes.length) {
       selectionBox.hidden = true;
       selectionBox.innerHTML = "";
       delete selectionBox.dataset.directSignature;
+      delete selectionBox.dataset.directGeometryState;
       return;
     }
 
-    const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(nodes[0]);
+    const isActiveTextSelection = activeDirectTextEditNode?.isConnected
+      && nodes.length === 1
+      && nodes[0] === activeDirectTextEditNode
+      && directTextEditSelectionRect;
+    const rect = isActiveTextSelection
+      ? { ...directTextEditSelectionRect }
+      : nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(nodes[0]);
+    const geometryLocked = !directSelectionAllowsGeometry(nodes);
     const signature = nodes.map((node) => node.dataset.chiseloId || ensureDirectId(node)).join("|");
-    const shouldRebuildChrome = selectionBox.dataset.directSignature !== signature;
+    const geometryState = geometryLocked ? "locked" : "free";
+    const shouldRebuildChrome = selectionBox.dataset.directSignature !== signature
+      || selectionBox.dataset.directGeometryState !== geometryState;
     selectionBox.hidden = false;
     selectionBox.classList.remove("is-locked");
     selectionBox.classList.toggle("is-group", nodes.length > 1);
-    selectionBox.style.left = `${rect.x}px`;
-    selectionBox.style.top = `${rect.y}px`;
-    selectionBox.style.width = `${rect.w}px`;
-    selectionBox.style.height = `${rect.h}px`;
+    selectionBox.classList.toggle("is-geometry-locked", geometryLocked);
+    const overlayRect = alignDirectSelectionBox(rect);
     selectionBox.style.transform = "none";
 
     if (!shouldRebuildChrome) {
@@ -2204,35 +2639,55 @@
       const chip = selectionBox.querySelector(".quick-action-menu .quick-chip");
       if (chip) chip.textContent = directQuickLabel(nodes, rect);
       const bar = selectionBox.querySelector(".quick-action-bar");
-      if (bar) requestAnimationFrame(() => placeDirectQuickActions(bar, rect));
+      if (bar) requestAnimationFrame(() => placeDirectQuickActions(bar, overlayRect));
       return;
     }
 
     selectionBox.dataset.directSignature = signature;
+    selectionBox.dataset.directGeometryState = geometryState;
     selectionBox.innerHTML = "";
 
-    for (const handle of handles) {
-      const grip = document.createElement("div");
-      grip.className = "resize-handle";
-      grip.dataset.handle = handle;
-      grip.addEventListener("pointerdown", (event) => beginResize(event, handle));
-      selectionBox.appendChild(grip);
+    if (!geometryLocked) {
+      for (const handle of handles) {
+        const grip = document.createElement("div");
+        grip.className = "resize-handle";
+        grip.dataset.handle = handle;
+        grip.addEventListener("pointerdown", (event) => beginResize(event, handle));
+        selectionBox.appendChild(grip);
+      }
     }
 
-    appendDirectQuickActions(nodes, rect);
+    appendDirectQuickActions(nodes, overlayRect);
   }
 
-  async function openHTMLFromBase64(base64, baseHref = "") {
+  async function openHTMLFromBase64(base64, baseHref = "", options = {}) {
     const html = decodeBase64(base64);
-    await loadDirectHTML(html, baseHref);
+    await loadDirectHTML(html, baseHref, options);
   }
 
   async function loadDirectHTML(html, baseHref = "", options = {}) {
     const normalized = normalizeDirectHTMLSource(html);
+    cancelDirectDeferredWork();
+    stopGestureListeners();
+    activeGesture = null;
     editorMode = "html";
+    directRuntimeMode = options.runtimeMode === "live" ? "live" : (options.runtimeMode === "safe" ? "safe" : directRuntimeMode);
+    if (Object.prototype.hasOwnProperty.call(options, "previewWidth")) {
+      directPreviewWidth = options.previewWidth !== null && options.previewWidth !== undefined && Number.isFinite(Number(options.previewWidth))
+        ? clampNumber(Math.round(Number(options.previewWidth)), 320, 2560)
+        : null;
+    }
+    if (!options.preserveOriginalSource) {
+      directOriginalSource = typeof options.originalSourceBase64 === "string"
+        ? decodeBase64(options.originalSourceBase64)
+        : html;
+    }
+    directDocumentModified = options.documentModified === true;
     if (options.resetView !== false) resetZoom();
     directHadDoctype = normalized.hadDoctype;
     directBaseHref = baseHref || directBaseHref || "";
+    const previousDirectCanvasSize = directCanvasSize;
+    directCanvasSize = options.preserveCanvasSize ? previousDirectCanvasSize : null;
     lastHTMLTreeSignature = "";
     lastHTMLDiagnosticsSignature = "";
     directStylesheetWritebackCount = 0;
@@ -2261,17 +2716,24 @@
     hoverBox.hidden = true;
     directFrame = document.createElement("iframe");
     directFrame.className = "html-frame";
-    directFrame.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+    directFrame.setAttribute(
+      "sandbox",
+      directRuntimeMode === "live" ? "allow-scripts allow-same-origin allow-forms" : "allow-scripts allow-same-origin"
+    );
+    directFrame.dataset.runtimeMode = directRuntimeMode;
     surface.innerHTML = "";
     surface.appendChild(directFrame);
 
-    await writeDirectFrameHTML(directFrame, withBaseElement(normalized.html, directBaseHref));
+    const runtimeHTML = directRuntimeMode === "safe" ? window.ChiseloRuntimeSafety.prepareHTML(normalized.html) : normalized.html;
+    await writeDirectFrameHTML(directFrame, withBaseElement(runtimeHTML, directBaseHref));
     setupDirectDocument();
+    applyDirectPseudoPreviewState();
     renderDirectHTML({ preserveScale: options.resetView === false });
     if (!options.preserveBaseline) {
       scheduleDirectVisualBaselineCapture();
     }
-    postHTMLTreeChanged();
+    scheduleHTMLTreeChanged({ includeDiagnostics: false, delay: 40 });
+    scheduleHTMLDiagnosticsChanged({ delay: 80, idleTimeout: 1200 });
     postSelectionChanged();
   }
 
@@ -2282,7 +2744,6 @@
       const doc = directFrame?.contentDocument;
       if (editorMode !== "html" || !doc?.body) return;
       directVisualBaseline = captureDirectVisualSnapshot(doc);
-      scheduleHTMLDiagnosticsChanged();
     }, delay);
   }
 
@@ -2303,14 +2764,15 @@
   function captureDirectStylesheetSnapshot(doc) {
     const rules = new Map();
     const selectorCounts = new Map();
-    for (const rule of localDirectStyleRules(doc)) {
-      const selector = String(rule.selectorText || "").trim();
+    for (const entry of localDirectStyleRules(doc)) {
+      const selector = String(entry.selector || "").trim();
       if (!selector) continue;
-      const occurrence = (selectorCounts.get(selector) || 0) + 1;
-      selectorCounts.set(selector, occurrence);
-      rules.set(`${selector}#${occurrence}`, {
+      const selectorKey = `${entry.sheetInfo.key}::${selector}`;
+      const occurrence = (selectorCounts.get(selectorKey) || 0) + 1;
+      selectorCounts.set(selectorKey, occurrence);
+      rules.set(`${selectorKey}#${occurrence}`, {
         selector,
-        styleText: rule.style?.cssText || ""
+        styleText: entry.rule.style?.cssText || ""
       });
     }
     return rules;
@@ -2325,6 +2787,7 @@
     const rect = directNodeRect(node);
     const image = node.matches?.("img") ? node : null;
     const text = normalizedText(node);
+    const childElementCount = node.children?.length || 0;
     return {
       elementId: optionalDirectId(node),
       label: diagnosticNodeLabel(node),
@@ -2333,10 +2796,11 @@
       previousSiblingKey: directVisualSiblingKey(node.previousElementSibling),
       nextSiblingKey: directVisualSiblingKey(node.nextElementSibling),
       outerHTML: directVisualSnapshotHTML(node),
-      childElementCount: node.children?.length || 0,
+      childElementCount,
       text,
       imageSource: image ? (image.getAttribute("src") || image.currentSrc || "") : "",
       styleAttr: node.getAttribute("style") || "",
+      localFrameLocked: node.dataset.chiseloLocalFrameLocked === "true",
       stylesheetRule: directVisualStylesheetRuleSnapshot(node),
       rect: {
         x: Math.round(rect.x),
@@ -2367,16 +2831,39 @@
 
   function directVisualSnapshotHTML(node) {
     if (!node || node.matches?.("html,body")) return "";
+    if (directElementDescendantCount(node, MAX_VISUAL_SNAPSHOT_DESCENDANTS + 1) > MAX_VISUAL_SNAPSHOT_DESCENDANTS) {
+      return "";
+    }
     const clone = node.cloneNode(true);
     for (const child of [clone, ...clone.querySelectorAll?.("*") || []]) {
       cleanDirectExportNode(child);
       stripChiseloAttributes(child);
     }
-    return clone.outerHTML || "";
+    const html = clone.outerHTML || "";
+    return html.length <= MAX_VISUAL_SNAPSHOT_HTML_LENGTH ? html : "";
+  }
+
+  function directElementDescendantCount(node, limit = Infinity) {
+    if (!node?.children) return 0;
+    let count = 0;
+    const stack = [...node.children];
+    while (stack.length) {
+      const current = stack.pop();
+      count += 1;
+      if (count >= limit) return count;
+      if (current?.children?.length) {
+        stack.push(...current.children);
+      }
+    }
+    return count;
   }
 
   function directSourceSnippetForNode(node) {
-    const html = directVisualSnapshotHTML(node);
+    const descendantCount = directElementDescendantCount(node, MAX_SOURCE_SNIPPET_DESCENDANTS + 1);
+    if (descendantCount > MAX_SOURCE_SNIPPET_DESCENDANTS) {
+      return directLargeSourceSnippetForNode(node, descendantCount);
+    }
+    const html = directSourceSnapshotHTML(node);
     if (!html) return { text: "", lineCount: 0 };
     const formatted = formatHTMLSnippet(html);
     const lines = formatted.split("\n");
@@ -2390,6 +2877,39 @@
       text = `${text}\n...`;
     }
     return { text, lineCount: lines.length };
+  }
+
+  function directSourceSnapshotHTML(node) {
+    if (!node || node.matches?.("html,body")) return "";
+    const clone = node.cloneNode(true);
+    for (const child of [clone, ...clone.querySelectorAll?.("*") || []]) {
+      cleanDirectExportNode(child);
+      stripChiseloAttributes(child);
+    }
+    return clone.outerHTML || "";
+  }
+
+  function directLargeSourceSnippetForNode(node, descendantCount) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return { text: "", lineCount: 0 };
+    const tag = node.tagName.toLowerCase();
+    const open = directOpeningTagForSnippet(node);
+    const close = `</${tag}>`;
+    return {
+      text: `${open}\n  ... ${descendantCount} nested elements omitted in preview ...\n${close}`,
+      lineCount: descendantCount + 2
+    };
+  }
+
+  function directOpeningTagForSnippet(node) {
+    const tag = node.tagName.toLowerCase();
+    const attrs = [];
+    for (const attr of [...node.attributes]) {
+      if (attr.name.startsWith("data-chiselo")) continue;
+      if (attr.name === "style" && !String(attr.value || "").trim()) continue;
+      attrs.push(`${attr.name}="${escapeHTML(attr.value || "")}"`);
+      if (attrs.length >= 8) break;
+    }
+    return attrs.length ? `<${tag} ${attrs.join(" ")}>` : `<${tag}>`;
   }
 
   function directSourceChildItemsForNode(node) {
@@ -2617,313 +3137,163 @@
     return { ok: true, element: selectedElement(), sourceSnippet: replacement.outerHTML || "", warnings: validation.warnings || [] };
   }
 
-  function preserveDirectSourceChildIds(previousRoot, replacementRoot) {
-    if (!previousRoot || !replacementRoot) return;
+  function applySelectedHTMLAttributes(attributes = {}) {
+    if (editorMode !== "html") return { ok: false, reason: "The current document is not in HTML mode." };
+    if (!directSelectedNode || !directSelectedNode.isConnected) return { ok: false, reason: "Select an HTML object first." };
+    if (directSelectionNodes().length > 1) return { ok: false, reason: "HTML attribute editing applies to one object at a time." };
 
-    if (!replacementRoot.dataset?.chiseloId && previousRoot.dataset?.chiseloId) {
-      replacementRoot.dataset.chiseloId = previousRoot.dataset.chiseloId;
+    const inlineStyle = String(attributes.inlineStyle ?? "");
+    const cssValidation = validateDirectInlineCSSText(inlineStyle);
+    if (!cssValidation.ok) return cssValidation;
+
+    const linkHref = String(attributes.linkHref ?? "");
+    if (/^\s*javascript:/i.test(linkHref)) {
+      return { ok: false, reason: "A link address cannot use javascript:." };
     }
 
-    preserveDirectSourceSubtreeIds(previousRoot, replacementRoot);
-  }
+    const linkTarget = String(attributes.linkTarget ?? "").trim();
+    const link = directLinkNodeForAttributes(directSelectedNode);
+    if ((linkHref.trim() || linkTarget) && !link) {
+      return { ok: false, reason: "The current object is not a link. Select the <a> element before editing href or target." };
+    }
 
-  function preserveDirectSourceSubtreeIds(previousNode, replacementNode) {
-    const previousChildren = [...previousNode.querySelectorAll?.("*") || []]
-      .filter((node) => directSourceNodeIsVisible(node));
-    const replacementChildren = [...replacementNode.querySelectorAll?.("*") || []]
-      .filter((node) => directSourceNodeIsVisible(node));
-    if (!previousChildren.length || !replacementChildren.length) return;
+    pushHistory({ label: "Edit HTML attributes" });
+    withSuppressedDirectMutationRefresh(() => {
+      const className = String(attributes.className ?? "").trim().replace(/\s+/g, " ");
+      if (className) directSelectedNode.setAttribute("class", className);
+      else directSelectedNode.removeAttribute("class");
 
-    for (const { previous, replacement } of directSourceMatchedChildPairs(previousChildren, replacementChildren)) {
-      if (previous.dataset?.chiseloId && !replacement.dataset?.chiseloId) {
-        replacement.dataset.chiseloId = previous.dataset.chiseloId;
+      if (inlineStyle.trim()) {
+        directSelectedNode.style.cssText = inlineStyle.trim();
+      } else {
+        directSelectedNode.removeAttribute("style");
       }
-    }
+
+      if (link) {
+        if (linkHref.trim()) link.setAttribute("href", linkHref.trim());
+        else link.removeAttribute("href");
+
+        if (linkTarget) link.setAttribute("target", linkTarget);
+        else link.removeAttribute("target");
+      }
+    });
+
+    clearDirectSelectionPayloadCache();
+    updateSelectionBox();
+    scheduleDirectLayoutRefresh();
+    scheduleHTMLTreeChanged();
+    scheduleHTMLDiagnosticsChanged();
+    postSelectionChanged({ immediate: true });
+    return { ok: true, element: selectedElement() };
   }
 
-  function sourceDraftMappingSummary(previousRoot, replacementRoot) {
-    if (!previousRoot || !replacementRoot) return null;
-
-    const previousNodes = [previousRoot, ...([...previousRoot.querySelectorAll?.("*") || []].filter((node) => directSourceNodeIsVisible(node)))];
-    const replacementNodes = [replacementRoot, ...([...replacementRoot.querySelectorAll?.("*") || []].filter((node) => directSourceNodeIsVisible(node)))];
-    const pairs = directSourceMatchedChildPairs(previousNodes, replacementNodes);
-    const matchedPrevious = new Set(pairs.map((pair) => pair.previous));
-    const matchedReplacement = new Set(pairs.map((pair) => pair.replacement));
-
-    const items = [];
-    for (const pair of pairs.slice(0, 8)) {
-      items.push({
-        slot: "preserved",
-        kind: "保留原对象",
-        previousID: pair.previous.dataset?.chiseloId || "",
-        previousTagName: pair.previous.tagName?.toLowerCase?.() || "",
-        previousLabel: directSourcePreviewLabel(pair.previous),
-        nextTagName: pair.replacement.tagName?.toLowerCase?.() || "",
-        nextLabel: directSourcePreviewLabel(pair.replacement),
-        score: Math.round(pair.score || 0)
-      });
+  function validateDirectInlineCSSText(cssText) {
+    const text = String(cssText || "");
+    if (/[<>]/.test(text)) return { ok: false, reason: "Inline CSS cannot contain < or >." };
+    if (/expression\s*\(/i.test(text) || /javascript\s*:/i.test(text)) {
+      return { ok: false, reason: "Inline CSS contains an unsafe expression or a javascript: URL." };
     }
+    return { ok: true };
+  }
 
-    const addedAll = replacementNodes.filter((node) => !matchedReplacement.has(node));
-    const unmatchedAll = previousNodes.filter((node) => !matchedPrevious.has(node));
-    const addedNodes = addedAll.slice(0, 4);
-    for (const node of addedNodes) {
-      items.push({
-        slot: "added",
-        kind: "新增对象",
-        previousID: null,
-        previousTagName: null,
-        previousLabel: null,
-        nextTagName: node.tagName?.toLowerCase?.() || "",
-        nextLabel: directSourcePreviewLabel(node),
-        score: null
-      });
+  function validateSelectedStylesheetRule(ruleText) {
+    if (editorMode !== "html") return { ok: false, reason: "The current document is not in HTML mode." };
+    if (!directSelectedNode || !directSelectedNode.isConnected) return { ok: false, reason: "Select an HTML object first." };
+    if (directSelectionNodes().length > 1) return { ok: false, reason: "CSS rule editing applies to one object at a time." };
+
+    const match = uniqueDirectStylesheetRule(directSelectedNode);
+    if (!match?.rule?.style) return { ok: false, reason: "The current object has no unique writable CSS rule." };
+
+    const parsed = parseSingleStylesheetRule(ruleText, directSelectedNode.ownerDocument);
+    if (!parsed.ok) return parsed;
+    if (String(parsed.selector || "").trim() !== String(match.selector || "").trim()) {
+      return { ok: false, reason: `The rule selector must remain ${match.selector}.` };
     }
-
-    const unmatchedNodes = unmatchedAll.slice(0, 4);
-    for (const node of unmatchedNodes) {
-      items.push({
-        slot: "unmatched",
-        kind: "原对象将替换",
-        previousID: node.dataset?.chiseloId || "",
-        previousTagName: node.tagName?.toLowerCase?.() || "",
-        previousLabel: directSourcePreviewLabel(node),
-        nextTagName: "",
-        nextLabel: "",
-        score: null
-      });
-    }
-
     return {
-      preservedCount: pairs.length,
-      addedCount: addedAll.length,
-      unmatchedCount: unmatchedAll.length,
-      structureRisk: addedAll.length > 0 || unmatchedAll.length > 0,
-      items
+      ok: true,
+      selector: match.selector,
+      ruleSnippet: `${match.selector} { ${parsed.style.cssText || ""} }`,
+      ruleLine: directStylesheetRuleLocator(match).ruleLine
     };
   }
 
-  function directSourceMatchedChildPairs(previousChildren, replacementChildren) {
-    const candidates = [];
+  function applySelectedStylesheetRule(ruleText) {
+    const validation = validateSelectedStylesheetRule(ruleText);
+    if (!validation.ok) return validation;
 
-    for (let previousIndex = 0; previousIndex < previousChildren.length; previousIndex += 1) {
-      for (let replacementIndex = 0; replacementIndex < replacementChildren.length; replacementIndex += 1) {
-        const previous = previousChildren[previousIndex];
-        const replacement = replacementChildren[replacementIndex];
-        const score = directSourceMatchScore(previous, replacement, previousIndex, replacementIndex);
-        if (score > 0) {
-          candidates.push({ previous, replacement, score, previousIndex, replacementIndex });
-        }
+    const match = uniqueDirectStylesheetRule(directSelectedNode);
+    if (!match?.rule?.style) return { ok: false, reason: "The current object has no unique writable CSS rule." };
+    const parsed = parseSingleStylesheetRule(ruleText, directSelectedNode.ownerDocument);
+    if (!parsed.ok) return parsed;
+
+    pushHistory({ label: "Edit CSS rule" });
+    match.rule.style.cssText = parsed.style.cssText || "";
+    directStylesheetWritebackCount += 1;
+    clearDirectSelectionPayloadCache();
+    updateSelectionBox();
+    scheduleDirectLayoutRefresh();
+    scheduleHTMLTreeChanged();
+    scheduleHTMLDiagnosticsChanged();
+    postSelectionChanged({ immediate: true });
+    return {
+      ok: true,
+      selector: match.selector,
+      element: selectedElement(),
+      ruleSnippet: `${match.selector} { ${parsed.style.cssText || ""} }`
+    };
+  }
+
+  function parseSingleStylesheetRule(ruleText, doc) {
+    const text = String(ruleText || "").trim();
+    if (!text) return { ok: false, reason: "The CSS rule cannot be empty." };
+    if (/[<>]/.test(text)) return { ok: false, reason: "The CSS rule cannot contain < or >." };
+    if (/@import\b|@media\b|@supports\b|@container\b|@layer\b|@keyframes\b/i.test(text)) {
+      return { ok: false, reason: "Only one standard CSS rule can be edited here." };
+    }
+    if (/expression\s*\(/i.test(text) || /javascript\s*:/i.test(text)) {
+      return { ok: false, reason: "The CSS rule contains an unsafe expression or a javascript: URL." };
+    }
+
+    const style = doc.createElement("style");
+    style.setAttribute("data-chiselo-style", "");
+    style.textContent = text;
+    (doc.head || doc.body || doc.documentElement).appendChild(style);
+    try {
+      const rules = [...(style.sheet?.cssRules || [])];
+      if (rules.length !== 1 || rules[0].type !== CSSRule.STYLE_RULE) {
+        return { ok: false, reason: "Only one standard CSS rule can be edited here." };
       }
+      const rule = rules[0];
+      const selector = String(rule.selectorText || "").trim();
+      if (!selector) return { ok: false, reason: "The CSS rule has no selector." };
+      return {
+        ok: true,
+        selector,
+        style: rule.style
+      };
+    } catch {
+      return { ok: false, reason: "The CSS rule syntax is invalid." };
+    } finally {
+      style.remove();
     }
-
-    candidates.sort((left, right) =>
-      right.score - left.score ||
-      left.previousIndex - right.previousIndex ||
-      left.replacementIndex - right.replacementIndex
-    );
-
-    const matchedPrevious = new Set();
-    const matchedReplacement = new Set();
-    const assignments = [];
-
-    for (const candidate of candidates) {
-      if (candidate.score < 18) continue;
-      if (matchedPrevious.has(candidate.previous) || matchedReplacement.has(candidate.replacement)) continue;
-      matchedPrevious.add(candidate.previous);
-      matchedReplacement.add(candidate.replacement);
-      assignments.push(candidate);
-    }
-
-    return assignments;
   }
 
-  function directSourceMatchScore(previous, replacement, previousIndex = 0, replacementIndex = 0) {
-    if (!previous || !replacement) return Number.NEGATIVE_INFINITY;
-
-    let score = 0;
-    const previousTag = previous.tagName?.toLowerCase?.() || "";
-    const replacementTag = replacement.tagName?.toLowerCase?.() || "";
-    if (previousTag && replacementTag && previousTag === replacementTag) score += 24;
-
-    const previousId = previous.getAttribute?.("id") || "";
-    const replacementId = replacement.getAttribute?.("id") || "";
-    if (previousId && replacementId) {
-      if (previousId === replacementId) {
-        score += 120;
-      } else if (directStringSimilarity(previousId, replacementId) >= 0.75) {
-        score += 30;
-      }
-    } else if (previousId || replacementId) {
-      score += 4;
-    }
-
-    score += directSourceClassScore(previous, replacement);
-    score += directSourceTokenScore(previous, replacement);
-    score += directSourceTextScore(previous, replacement);
-
-    const previousCount = directSourceMatchableChildren(previous).length;
-    const replacementCount = directSourceMatchableChildren(replacement).length;
-    score += Math.max(0, 10 - Math.abs(previousCount - replacementCount));
-
-    const previousKey = previous.parentElement ? directRelativeElementKey(previous.parentElement, previous) : "";
-    const replacementKey = replacement.parentElement ? directRelativeElementKey(replacement.parentElement, replacement) : "";
-    if (previousKey && previousKey === replacementKey) score += 24;
-
-    score += Math.max(0, 12 - Math.abs(previousIndex - replacementIndex) * 3);
-    return score;
+  function directLinkNodeForAttributes(node) {
+    if (!node?.matches) return null;
+    if (node.matches("a")) return node;
+    return null;
   }
 
-  function directSourceClassScore(previous, replacement) {
-    const previousClasses = normalizedClassList(previous).split(/\s+/).filter(Boolean);
-    const replacementClasses = normalizedClassList(replacement).split(/\s+/).filter(Boolean);
-    if (!previousClasses.length && !replacementClasses.length) return 0;
-
-    const previousSet = new Set(previousClasses);
-    const replacementSet = new Set(replacementClasses);
-    let shared = 0;
-    for (const name of previousSet) {
-      if (replacementSet.has(name)) shared += 1;
-    }
-
-    const union = new Set([...previousSet, ...replacementSet]).size || 1;
-    let score = Math.round((shared / union) * 18);
-    if (previousClasses.length && replacementClasses.length && previousClasses.join("|") === replacementClasses.join("|")) {
-      score += 12;
-    }
-    return score;
+  function preserveDirectSourceChildIds(previousRoot, replacementRoot) {
+    return directSourceMapping.preserveDirectSourceChildIds(previousRoot, replacementRoot);
   }
 
-  function directSourceTokenScore(previous, replacement) {
-    const previousTokens = directSourceIdentityTokens(previous);
-    const replacementTokens = directSourceIdentityTokens(replacement);
-    if (!previousTokens.length && !replacementTokens.length) return 0;
-
-    const previousSet = new Set(previousTokens);
-    const replacementSet = new Set(replacementTokens);
-    let shared = 0;
-    for (const token of previousSet) {
-      if (replacementSet.has(token)) shared += 1;
-    }
-
-    return Math.min(24, shared * 8);
-  }
-
-  function directSourceTextScore(previous, replacement) {
-    const previousText = directSourceMatchText(previous);
-    const replacementText = directSourceMatchText(replacement);
-    if (!previousText && !replacementText) return 0;
-    if (previousText && previousText === replacementText) return 18;
-
-    const previousTrimmed = previousText.replace(/\s+/g, " ");
-    const replacementTrimmed = replacementText.replace(/\s+/g, " ");
-    if (!previousTrimmed || !replacementTrimmed) return 0;
-
-    if (previousTrimmed === replacementTrimmed) return 18;
-    if (previousTrimmed.includes(replacementTrimmed) || replacementTrimmed.includes(previousTrimmed)) {
-      return Math.min(16, Math.max(previousTrimmed.length, replacementTrimmed.length) / 2);
-    }
-
-    const prefixLength = directCommonPrefixLength(previousTrimmed, replacementTrimmed);
-    if (prefixLength >= 4) return Math.min(10, prefixLength);
-    return 0;
-  }
-
-  function directSourceMatchText(node) {
-    if (!node) return "";
-    return normalizedText(node).slice(0, 64);
-  }
-
-  function directSourcePreviewLabel(node) {
-    if (!node) return "";
-    const tag = node.tagName?.toLowerCase?.() || "";
-    const text = normalizedText(node).slice(0, 28);
-    return text ? `${tag} “${text}”` : directNodeToken(node);
-  }
-
-  function directSourceIdentityTokens(node) {
-    if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
-
-    const attributes = ["role", "aria-label", "aria-labelledby", "title", "alt", "name", "placeholder", "type", "data-testid", "data-name"];
-    const tokens = [];
-    for (const attribute of attributes) {
-      const value = node.getAttribute?.(attribute);
-      if (value) tokens.push(value.trim().toLowerCase());
-    }
-    return [...new Set(tokens)];
-  }
-
-  function directSourceMatchableChildren(node) {
-    if (!node || node.nodeType !== Node.ELEMENT_NODE) return [];
-    return [...node.children].filter((child) => directSourceNodeIsVisible(child));
-  }
-
-  function directCommonPrefixLength(left, right) {
-    const length = Math.min(left.length, right.length);
-    let index = 0;
-    while (index < length && left[index] === right[index]) index += 1;
-    return index;
-  }
-
-  function directStringSimilarity(left, right) {
-    const a = String(left || "").trim().toLowerCase();
-    const b = String(right || "").trim().toLowerCase();
-    if (!a || !b) return 0;
-    if (a === b) return 1;
-
-    const longest = Math.max(a.length, b.length);
-    const prefix = directCommonPrefixLength(a, b);
-    const suffix = directCommonSuffixLength(a, b);
-    return Math.max(prefix, suffix) / longest;
-  }
-
-  function directCommonSuffixLength(left, right) {
-    const max = Math.min(left.length, right.length);
-    let index = 0;
-    while (index < max && left[left.length - 1 - index] === right[right.length - 1 - index]) index += 1;
-    return index;
-  }
-
-  function directRelativeElementKey(root, node) {
-    if (!root || !node || node === root) return "";
-
-    const parts = [];
-    let current = node;
-    while (current && current !== root && current.parentElement) {
-      const siblings = [...current.parentElement.children]
-        .filter((child) => child.tagName === current.tagName);
-      const index = siblings.indexOf(current);
-      if (index < 0) return "";
-      parts.unshift(`${current.tagName.toLowerCase()}:${index}`);
-      current = current.parentElement;
-    }
-
-    return current === root ? parts.join(">") : "";
+  function sourceDraftMappingSummary(previousRoot, replacementRoot) {
+    return directSourceMapping.sourceDraftMappingSummary(previousRoot, replacementRoot);
   }
 
   function normalizeDirectHTMLSource(input) {
-    let html = String(input || "");
-    const hadDoctype = /^\s*<!doctype/i.test(html);
-    const hasHTML = /<html[\s>]/i.test(html);
-    const hasHead = /<head[\s>]/i.test(html);
-    const hasBody = /<body[\s>]/i.test(html);
-
-    if (!hasHTML) {
-      const head = hasHead ? "" : "<head><meta charset=\"utf-8\"></head>";
-      const body = hasBody ? html : `<body>${html}</body>`;
-      return { html: `<html>${head}${body}</html>`, hadDoctype };
-    }
-
-    if (!hasHead) {
-      html = html.replace(/<html([^>]*)>/i, "<html$1><head><meta charset=\"utf-8\"></head>");
-    }
-
-    if (!hasBody) {
-      html = html.replace(/<\/head>/i, "</head><body>");
-      html = html.replace(/<\/html>\s*$/i, "</body></html>");
-    }
-
-    return { html, hadDoctype };
+    return directSourceMapping.normalizeDirectHTMLSource(input);
   }
 
   function waitForFrame(frame) {
@@ -3033,10 +3403,26 @@
       if (event.shiftKey || event.metaKey || event.ctrlKey) {
         event.preventDefault();
         event.stopPropagation();
-        toggleDirectSelection(node);
+        selectDirectNode(node);
         return;
       }
-      if (event.target.closest?.("[contenteditable='true']")) return;
+      const editableTarget = event.target.closest?.("[contenteditable='true']");
+      if (activeDirectTextEditNode?.isConnected && editableTarget !== activeDirectTextEditNode) {
+        finishActiveDirectTextEdit({ defer: false });
+      }
+
+      if (editableTarget) {
+        const editableNode = directEditableTarget(editableTarget);
+        const dragNode = isDirectSelected(editableNode) ? editableNode : node;
+        if (dragNode && isDirectSelected(dragNode)) {
+          beginDirectDrag(event, dragNode, {
+            preventDefault: false,
+            stopPropagation: false,
+            finishTextEditOnStart: true
+          });
+        }
+        return;
+      }
 
       if (event.detail >= 2) {
         const textNode = directTextEditTargetFromEvent(event);
@@ -3096,11 +3482,18 @@
     const observer = new MutationObserver((mutations) => {
       let sawAddedEditableNodes = false;
       let sawRelevantMutations = false;
+      let sawStructuralCanvasMutation = false;
       for (const mutation of mutations) {
         if (mutation.type === "attributes" && (mutation.attributeName || "").startsWith("data-chiselo")) {
           continue;
         }
         sawRelevantMutations = true;
+        if (mutation.type === "childList") {
+          const changedNodes = [...mutation.addedNodes, ...mutation.removedNodes];
+          if (changedNodes.some((node) => node.nodeType === Node.ELEMENT_NODE)) {
+            sawStructuralCanvasMutation = true;
+          }
+        }
         if (mutation.type === "attributes" && mutation.target?.nodeType === Node.ELEMENT_NODE) {
           applyDirectEditingAssist(mutation.target);
         }
@@ -3111,7 +3504,10 @@
         }
       }
       if (!sawRelevantMutations) return;
+      if (sawStructuralCanvasMutation) directCanvasSize = null;
       const affectsTree = mutationsAffectHTMLTree(mutations);
+      if (suppressDirectMutationRefresh && !affectsTree) return;
+      clearDirectSelectionPayloadCache();
       if (activeGesture?.mode === "html") {
         directMutationRefreshPending = true;
         if (affectsTree) directTreeRefreshPending = true;
@@ -3136,20 +3532,31 @@
 
   function directEditableTarget(target) {
     if (!target || target.nodeType !== Node.ELEMENT_NODE) return null;
+    if (isDirectRootNode(target) || isDirectNonEditableElement(target)) return null;
     const doc = target.ownerDocument;
-    if (target === doc.documentElement) return doc.body;
-    return target.closest("body *") || doc.body;
+    const node = target.closest("body *") || doc.body;
+    return isDirectRootNode(node) || isDirectNonEditableElement(node) ? null : node;
   }
 
   function prepareDirectSubtree(root) {
     if (!root || root.nodeType !== Node.ELEMENT_NODE) return;
     const nodes = [root, ...(root.querySelectorAll?.("*") || [])];
     for (const node of nodes) {
+      if (isDirectNonEditableElement(node)) continue;
       ensureDirectId(node);
       applyDirectEditingAssist(node);
     }
     setupDirectResourceTracking(root);
     normalizeDirectTablesForEditing(root);
+  }
+
+  function isDirectNonEditableElement(node) {
+    const tagName = node?.tagName?.toLowerCase?.() || "";
+    return DIRECT_NON_EDITABLE_TAGS.has(tagName) || node?.hasAttribute?.("data-chiselo-style");
+  }
+
+  function isDirectRootNode(node) {
+    return Boolean(node?.matches?.("html,body"));
   }
 
   function applyDirectEditingAssist(node) {
@@ -3396,12 +3803,6 @@
     return unique;
   }
 
-  function distanceToRect(x, y, rect) {
-    const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
-    const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
-    return Math.hypot(dx, dy);
-  }
-
   function directTextEditTargetFromNode(node) {
     if (!node) return null;
 
@@ -3518,7 +3919,7 @@
     budget.remaining -= 1;
 
     const children = [];
-    if (depth < 6 && budget.remaining > 0) {
+    if (!isDirectTreeLeafNode(node) && depth < 6 && budget.remaining > 0) {
       const childLimit = depth === 0 ? 14 : 10;
       for (const child of visibleTreeChildren(node)) {
         if (children.length >= childLimit || budget.remaining <= 0) break;
@@ -3551,6 +3952,7 @@
     if (tag === "nav") return { role: "navigation", label: "Navigation" };
     if (tag === "aside") return { role: "sidebar", label: "Sidebar" };
     if (/^(h[1-6])$/.test(tag)) return { role: "heading", label: `Heading ${tag.toUpperCase()}` };
+    if (tag !== "img" && tag !== "picture" && isImageReferenceNode(node)) return { role: "image-reference", label: "Image Reference" };
     if (tag === "p") return { role: "paragraph", label: "Paragraph" };
     if (tag === "span" || tag === "strong" || tag === "em" || tag === "small") return { role: "text", label: "Text" };
     if (tag === "ul" || tag === "ol") return { role: "list", label: "List" };
@@ -3562,7 +3964,7 @@
     if (tag === "thead" || tag === "tbody" || tag === "tfoot") return { role: "table-section", label: "Table Section" };
     if (tag === "tr") return { role: "table-row", label: "Table Row" };
     if (tag === "th") return { role: "table-header-cell", label: "Header Cell" };
-    if (tag === "td") return { role: "table-cell", label: "Cell" };
+    if (tag === "td") return { role: "table-cell", label: "Table Cell" };
     if (tag === "a") return { role: "link", label: "Link" };
     if (tag === "button") return { role: "button", label: "Button" };
     if (tag === "form") return { role: "form", label: "Form" };
@@ -3575,9 +3977,9 @@
     if (/card|panel|tile|box/.test(names)) return { role: "card", label: "Card" };
     if (/table|matrix|grid/.test(names)) return { role: "table-like", label: "Table/Matrix" };
     if (/chart|graph|figure|visual/.test(names)) return { role: "visual", label: "Chart" };
-    if (/module|block|section|content|item/.test(names)) return { role: "module", label: "Module" };
+    if (/module|block|section|content|item/.test(names)) return { role: "module", label: "Section" };
 
-    if (tag === "section" || tag === "article") return { role: "module", label: "Module" };
+    if (tag === "section" || tag === "article") return { role: "module", label: "Section" };
     if (tag === "div") return { role: "container", label: "Container" };
     return { role: "object", label: "Object" };
   }
@@ -3587,12 +3989,42 @@
       const tag = child.tagName.toLowerCase();
       if (["script", "style", "meta", "link", "base", "title", "noscript"].includes(tag)) return false;
       if (child.hasAttribute("data-chiselo-style")) return false;
+      if (isDecorativeDirectTreeNode(child)) return false;
 
       const style = child.ownerDocument.defaultView.getComputedStyle(child);
       const rect = child.getBoundingClientRect();
       const hasText = htmlTreeText(child).length > 0;
       return isVisibleStyle(style) && (rect.width > 3 || rect.height > 3 || hasText);
     });
+  }
+
+  function isDirectTreeLeafNode(node) {
+    if (!node?.matches) return false;
+    if (node.matches("button,[role='button'],input,textarea,select,option,svg,canvas,video,audio,iframe")) return true;
+    return isCompactDirectTreeComponent(node);
+  }
+
+  function isCompactDirectTreeComponent(node) {
+    if (!node?.children?.length) return false;
+    const tag = node.tagName.toLowerCase();
+    if (!["div", "span", "p", "li", "a", "label"].includes(tag)) return false;
+    if (!htmlTreeText(node)) return false;
+
+    const rect = node.getBoundingClientRect();
+    if (rect.width < 8 || rect.height < 8 || rect.height > 58) return false;
+    const children = [...node.children].filter((child) => !isDecorativeDirectTreeNode(child));
+    if (children.length > 6) return false;
+    return children.every((child) => {
+      const childRect = child.getBoundingClientRect();
+      return childRect.height <= rect.height + 6 && childRect.width <= rect.width + 8;
+    });
+  }
+
+  function isDecorativeDirectTreeNode(node) {
+    if (!node?.matches) return false;
+    const text = normalizedText(node);
+    if (text) return false;
+    return node.matches("i[data-lucide],svg.lucide,[aria-hidden='true'].lucide,[class~='icon']");
   }
 
   function htmlTreeLabel(node) {
@@ -3632,7 +4064,8 @@
     const seen = new Set();
 
     for (const node of nodes || []) {
-      if (!node || !node.isConnected || node.nodeType !== Node.ELEMENT_NODE) continue;
+      if (!node || !node.isConnected || node.nodeType !== Node.ELEMENT_NODE
+        || isDirectRootNode(node) || isDirectNonEditableElement(node)) continue;
       if (seen.has(node)) continue;
       seen.add(node);
       uniqueNodes.push(node);
@@ -3640,8 +4073,14 @@
     }
 
     const nextActiveNode = activeNode && uniqueNodes.includes(activeNode) ? activeNode : uniqueNodes[uniqueNodes.length - 1] || uniqueNodes[0] || null;
+    const activeTextNode = activeDirectTextEditNode?.isConnected ? activeDirectTextEditNode : null;
+    const keepsOnlyActiveTextNode = activeTextNode && uniqueNodes.length === 1 && uniqueNodes[0] === activeTextNode;
+    if (activeTextNode && !keepsOnlyActiveTextNode) {
+      finishActiveDirectTextEdit({ defer: false });
+    }
     if (directSelectionMatches(uniqueNodes, nextActiveNode)) return;
 
+    clearDirectSelectionPayloadCache();
     directSelectedNodes = uniqueNodes;
     directSelectedNode = nextActiveNode;
     hoverBox.hidden = true;
@@ -3656,12 +4095,242 @@
     return nodes.every((node, index) => directSelectedNodes[index] === node);
   }
 
+  function setPseudoPreviewState(state) {
+    const normalized = String(state || "none").trim().toLowerCase();
+    if (!["none", "hover", "focus"].includes(normalized)) {
+      return { ok: false, reason: "The pseudo-class preview state is not supported." };
+    }
+    directPseudoPreviewState = normalized;
+    applyDirectPseudoPreviewState();
+    updateSelectionBox();
+    postSelectionChanged({ immediate: true });
+    return { ok: true, state: directPseudoPreviewState, element: selectedElement() };
+  }
+
+  function applyDirectPseudoPreviewState() {
+    const doc = directFrame?.contentDocument;
+    if (!doc?.body) return;
+
+    clearDirectPseudoPreviewAttributes(doc);
+    const styleNode = ensureDirectPseudoPreviewStyle(doc);
+    if (styleNode) {
+      const cssText = buildDirectPseudoPreviewCSS(doc);
+      const nextText = cssText ? `\n${cssText}\n` : "";
+      if (styleNode.textContent !== nextText) styleNode.textContent = nextText;
+    }
+
+    if (directPseudoPreviewState === "none") return;
+    if (directSelectionNodes().length !== 1 || !directSelectedNode?.isConnected) return;
+
+    if (directPseudoPreviewState === "hover") {
+      directSelectedNode.setAttribute(DIRECT_PSEUDO_ATTR_HOVER, "true");
+      return;
+    }
+
+    if (directPseudoPreviewState === "focus") {
+      directSelectedNode.setAttribute(DIRECT_PSEUDO_ATTR_FOCUS, "true");
+      directSelectedNode.setAttribute(DIRECT_PSEUDO_ATTR_FOCUS_VISIBLE, "true");
+      directSelectedNode.setAttribute(DIRECT_PSEUDO_ATTR_FOCUS_WITHIN, "true");
+    }
+  }
+
+  function clearDirectPseudoPreviewAttributes(doc) {
+    for (const name of [DIRECT_PSEUDO_ATTR_HOVER, DIRECT_PSEUDO_ATTR_FOCUS, DIRECT_PSEUDO_ATTR_FOCUS_VISIBLE, DIRECT_PSEUDO_ATTR_FOCUS_WITHIN]) {
+      for (const node of doc.querySelectorAll(`[${name}]`)) {
+        node.removeAttribute(name);
+      }
+    }
+  }
+
+  function ensureDirectPseudoPreviewStyle(doc) {
+    let style = doc.querySelector("style[data-chiselo-pseudo-preview]");
+    if (style) return style;
+    style = doc.createElement("style");
+    style.setAttribute("data-chiselo-style", "");
+    style.setAttribute("data-chiselo-pseudo-preview", "");
+    (doc.head || doc.body || doc.documentElement).appendChild(style);
+    return style;
+  }
+
+  function buildDirectPseudoPreviewCSS(doc) {
+    const rules = [];
+    const seen = new Set();
+    for (const entry of localDirectStyleRules(doc)) {
+      const styleText = String(entry.rule?.style?.cssText || "").trim();
+      if (!styleText) continue;
+      for (const selector of pseudoPreviewSelectors(entry.selector || "")) {
+        const key = `${selector} { ${styleText} }`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        rules.push(key);
+      }
+    }
+    return rules.join("\n");
+  }
+
+  function pseudoPreviewSelectors(selectorText) {
+    const selectors = [];
+    for (const selector of splitSelectorList(selectorText)) {
+      const hover = transformSelectorForPseudoPreview(selector, "hover");
+      if (hover) selectors.push(hover);
+      const focus = transformSelectorForPseudoPreview(selector, "focus");
+      if (focus) selectors.push(focus);
+    }
+    return uniqueIds(selectors);
+  }
+
+  function transformSelectorForPseudoPreview(selector, mode) {
+    if (!selector) return null;
+    let output = String(selector);
+    let changed = false;
+    if (mode === "hover") {
+      output = output.replace(/:hover(?![-\w])/g, () => {
+        changed = true;
+        return `[${DIRECT_PSEUDO_ATTR_HOVER}]`;
+      });
+      return changed ? output : null;
+    }
+
+    output = output.replace(/:focus-visible(?![-\w])/g, () => {
+      changed = true;
+      return `[${DIRECT_PSEUDO_ATTR_FOCUS_VISIBLE}]`;
+    });
+    output = output.replace(/:focus-within(?![-\w])/g, () => {
+      changed = true;
+      return `[${DIRECT_PSEUDO_ATTR_FOCUS_WITHIN}]`;
+    });
+    output = output.replace(/:focus(?![-\w])/g, () => {
+      changed = true;
+      return `[${DIRECT_PSEUDO_ATTR_FOCUS}]`;
+    });
+    return changed ? output : null;
+  }
+
+  function splitSelectorList(selectorText) {
+    const output = [];
+    let current = "";
+    let depthParen = 0;
+    let depthBracket = 0;
+    let quote = "";
+    for (const char of String(selectorText || "")) {
+      if (quote) {
+        current += char;
+        if (char === quote) quote = "";
+        continue;
+      }
+      if (char === "\"" || char === "'") {
+        quote = char;
+        current += char;
+        continue;
+      }
+      if (char === "(") depthParen += 1;
+      else if (char === ")") depthParen = Math.max(0, depthParen - 1);
+      else if (char === "[") depthBracket += 1;
+      else if (char === "]") depthBracket = Math.max(0, depthBracket - 1);
+      if (char === "," && depthParen === 0 && depthBracket === 0) {
+        const trimmed = current.trim();
+        if (trimmed) output.push(trimmed);
+        current = "";
+        continue;
+      }
+      current += char;
+    }
+    const trimmed = current.trim();
+    if (trimmed) output.push(trimmed);
+    return output;
+  }
+
+  function directSelectionSignature(nodes = directSelectionNodes()) {
+    return nodes
+      .filter((node) => node?.isConnected)
+      .map((node) => node.dataset.chiseloId || ensureDirectId(node))
+      .join("|");
+  }
+
+  function clearDirectSelectionPayloadCache() {
+    directSelectionPayloadCache = null;
+    directSelectionPayloadCacheSignature = "";
+  }
+
+  function cacheDirectSelectionPayload(node, payload) {
+    if (!node || !payload || directSelectionNodes().length !== 1 || directSelectedNode !== node) return payload;
+    directSelectionPayloadCacheSignature = directSelectionSignature([node]);
+    directSelectionPayloadCache = payload;
+    return payload;
+  }
+
+  function cachedDirectSelectionPayload(node) {
+    if (!node || !node.isConnected || !directSelectionPayloadCache) return null;
+    if (directSelectionNodes().length !== 1 || directSelectedNode !== node) return null;
+    if (directSelectionPayloadCacheSignature !== directSelectionSignature([node])) return null;
+    const rect = directNodeRect(node);
+    return {
+      ...directSelectionPayloadCache,
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
+      text: normalizedText(node)
+    };
+  }
+
+  function updateDirectSelectionPayloadCache(nextElement = {}) {
+    const node = directSelectedNode;
+    if (!node || !node.isConnected || !directSelectionPayloadCache) return;
+    if (directSelectionNodes().length !== 1) return;
+    if (directSelectionPayloadCacheSignature !== directSelectionSignature([node])) return;
+
+    const rect = directNodeRect(node);
+    const nextStyle = nextElement.style
+      ? { ...(directSelectionPayloadCache.style || {}), ...nextElement.style }
+      : directSelectionPayloadCache.style;
+    const image = selectedImageNodeFor(node);
+    const imageReference = !image && isImageReferenceNode(node);
+    directSelectionPayloadCache = {
+      ...directSelectionPayloadCache,
+      ...directEditSafetyForNode(node, { imageReference }),
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
+      text: normalizedText(node),
+      style: nextStyle,
+      imageSource: image ? directImageSourceForPayload(image) : directSelectionPayloadCache.imageSource,
+      imageAlt: image ? (image.getAttribute("alt") || "") : directSelectionPayloadCache.imageAlt
+    };
+  }
+
+  function revealDirectNode(node, options = {}) {
+    if (!node || editorMode !== "html") return;
+
+    const behavior = options.immediate ? "auto" : "smooth";
+    node.scrollIntoView?.({ block: "center", inline: "center", behavior });
+
+    requestAnimationFrame(() => {
+      const rect = directNodeRect(node);
+      const targetCenterX = (rect.x + rect.w / 2) * scale;
+      const targetCenterY = (rect.y + rect.h / 2) * scale;
+      const nextLeft = Math.max(0, targetCenterX - viewport.clientWidth / 2);
+      const nextTop = Math.max(0, targetCenterY - viewport.clientHeight / 2);
+      viewport.scrollTo({ left: nextLeft, top: nextTop, behavior });
+      pingDirectSelection();
+    });
+  }
+
+  function pingDirectSelection() {
+    selectionBox.classList.remove("is-revealing");
+    void selectionBox.offsetWidth;
+    selectionBox.classList.add("is-revealing");
+    setTimeout(() => selectionBox.classList.remove("is-revealing"), 900);
+  }
+
   function directHistoryCoalesceKey(prefix, nodes) {
     return `${prefix}:${(nodes || []).map((node) => ensureDirectId(node)).join("|")}`;
   }
 
   function directSelectionNodes() {
-    directSelectedNodes = directSelectedNodes.filter((node) => node?.isConnected);
+    directSelectedNodes = directSelectedNodes.filter((node) => node?.isConnected
+      && !isDirectRootNode(node) && !isDirectNonEditableElement(node));
 
     if (directSelectedNode?.isConnected && !directSelectedNodes.includes(directSelectedNode)) {
       directSelectedNodes = [directSelectedNode];
@@ -3709,6 +4378,48 @@
     if (nodes.length > 1) setDirectSelection(nodes, directSelectedNode);
   }
 
+  function selectDirectTable() {
+    if (editorMode !== "html" || !directSelectedNode) return;
+    const table = directSelectedNode.matches?.("table")
+      ? directSelectedNode
+      : directSelectedNode.closest?.("table");
+    if (table) selectDirectNode(table);
+  }
+
+  function selectNodesForSelectedStylesheetRule() {
+    if (editorMode !== "html") return { ok: false, reason: "The current document is not in HTML mode." };
+    if (!directSelectedNode || !directSelectedNode.isConnected) return { ok: false, reason: "Select an HTML object first." };
+    if (directSelectionNodes().length > 1) return { ok: false, reason: "Select one object before locating objects that match the CSS rule." };
+
+    const match = uniqueDirectStylesheetRule(directSelectedNode);
+    if (!match?.selector) return { ok: false, reason: "The current object has no unique locatable CSS rule." };
+
+    const selector = String(match.selector || "").trim();
+    if (!selector) return { ok: false, reason: "The current object has no unique locatable CSS rule." };
+
+    let nodes = [];
+    try {
+      nodes = [...directSelectedNode.ownerDocument.querySelectorAll(selector)]
+        .filter((node) => node?.nodeType === Node.ELEMENT_NODE)
+        .filter((node) => !isDirectNonEditableElement(node))
+        .filter((node) => isDirectNodeVisible(node));
+    } catch {
+      return { ok: false, reason: `CSS rule ${selector} cannot be used to locate objects.` };
+    }
+
+    if (!nodes.length) {
+      return { ok: false, reason: `CSS rule ${selector} does not match a selectable object in the current document.` };
+    }
+
+    setDirectSelection(nodes, nodes.includes(directSelectedNode) ? directSelectedNode : nodes[nodes.length - 1], { immediate: true });
+    return {
+      ok: true,
+      selector,
+      count: nodes.length,
+      element: selectedElement()
+    };
+  }
+
   function updateHoverBox(node) {
     if (!node || !node.isConnected) {
       hoverBox.hidden = true;
@@ -3722,10 +4433,7 @@
     }
 
     hoverBox.hidden = false;
-    hoverBox.style.left = `${rect.x}px`;
-    hoverBox.style.top = `${rect.y}px`;
-    hoverBox.style.width = `${rect.w}px`;
-    hoverBox.style.height = `${rect.h}px`;
+    alignDirectOverlayBox(hoverBox, rect);
     hoverBox.innerHTML = `<div class="hover-label">${escapeHTML(directHoverLabel(node, rect))}</div>`;
   }
 
@@ -3760,7 +4468,8 @@
     const tag = node.tagName.toLowerCase();
     const size = `${Math.round(rect.w)} x ${Math.round(rect.h)}`;
     const resource = directResourceStatus(node);
-    if (isImageLikeNode(node)) return `IMG ${size}${resource ? ` - ${resource}` : ""}`;
+    if (isReplaceableImageNode(node)) return `IMG ${size}${resource ? ` - ${resource}` : ""}`;
+    if (isImageReferenceNode(node)) return `IMG REF ${size}`;
     if (node.closest?.("td, th")) return `CELL ${size}`;
     if (node.matches?.("table")) return `TABLE ${size}`;
     return `${tag.toUpperCase()} ${size}`;
@@ -3823,9 +4532,11 @@
       button.className = `quick-action${item.primary ? " is-primary" : ""}${item.danger ? " is-danger" : ""}`;
       button.textContent = item.label;
       button.title = item.title;
+      button.disabled = Boolean(item.disabled);
       button.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (item.disabled) return;
         setMenuOpen(false);
         runDirectQuickAction(item.action);
       });
@@ -3971,10 +4682,17 @@
       actions.push({ action: "editText", label: "Text", title: "Edit text", primary: true });
     }
 
-    if (single && isImageLikeNode(single)) {
+    if (single && isReplaceableImageNode(single)) {
       actions.push({ action: "replaceImage", label: "Replace", title: "Replace image", primary: true });
-      actions.push({ action: "imageContain", label: "Fit", title: "Show the whole image" });
+      actions.push({ action: "imageContain", label: "Fit", title: "Show the complete image" });
       actions.push({ action: "imageCover", label: "Fill", title: "Fill the image frame" });
+    } else if (single && isImageReferenceNode(single)) {
+      actions.push({
+        action: "imageReference",
+        label: "Image Reference",
+        title: "This is an image reference or placeholder, not a replaceable image node",
+        disabled: true
+      });
     }
 
     if (tableContext?.table) {
@@ -4042,6 +4760,13 @@
       case "selectSameClass":
         selectDirectSameClass();
         return;
+      case "insertDiv":
+      case "insertParagraph":
+      case "insertImage":
+      case "insertLink":
+      case "insertTable":
+        insertHTMLElement(action.replace(/^insert/, "").toLowerCase());
+        return;
       case "duplicate":
         duplicateSelected();
         return;
@@ -4063,7 +4788,7 @@
   }
 
   function directNodeAllowsTextEdit(node) {
-    if (!node || isImageLikeNode(node)) return false;
+    if (!node || isDirectRootNode(node) || isDirectNonEditableElement(node) || isReplaceableImageNode(node)) return false;
     if (["table", "thead", "tbody", "tfoot", "tr", "svg", "path", "line", "circle", "rect", "canvas", "video", "audio", "iframe", "input", "textarea", "select"].includes(node.tagName.toLowerCase())) return false;
     return normalizedText(node).length > 0 || node.matches?.("p,h1,h2,h3,h4,h5,h6,li,span,div,td,th,button,a");
   }
@@ -4131,8 +4856,152 @@
     };
   }
 
+  function directEditCanAffectLocalFrame(node, nextElement = {}) {
+    if (!node || node.matches?.("html,body") || directGeometryLockedNode(node)) return false;
+    if (typeof nextElement.text === "string" && nextElement.text !== normalizedText(node)) return true;
+    const style = nextElement.style || {};
+    return Object.keys(style).some((key) => DIRECT_LOCAL_FRAME_STYLE_KEYS.has(key));
+  }
+
+  function directLocalFrameStyleTarget(node) {
+    if (!node || node.getAttribute?.("style")) return null;
+    const match = uniqueDirectStylesheetRule(node);
+    return match ? {
+      style: match.rule.style,
+      selector: match.selector,
+      sheetInfo: match.sheetInfo
+    } : null;
+  }
+
+  function lockDirectLocalEditFrame(node, options = {}) {
+    if (!node || node.matches?.("html,body") || directGeometryLockedNode(node)) return false;
+    if (node.dataset.chiseloLocalFrameLocked === "true") return true;
+
+    const win = node.ownerDocument.defaultView;
+    const computed = win.getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    // Keep sub-pixel layout coordinates intact while locking the local frame;
+    // integer offsetWidth/offsetHeight introduce visible drift on fractional
+    // grid and flex layouts.
+    const width = rect.width || node.offsetWidth;
+    const height = rect.height || node.offsetHeight;
+    if (!(width > 0 && height > 0)) return false;
+
+    const styleTarget = options.styleTarget || directLocalFrameStyleTarget(node);
+    const targetStyle = styleTarget?.style || node.style;
+    if (styleTarget?.style) directStylesheetWritebackCount += 1;
+    node.dataset.chiseloLocalFrameLocked = "true";
+    targetStyle.boxSizing = "border-box";
+    const fixesWidth = computed.display === "inline"
+      || computed.display === "inline-block"
+      || computed.position === "absolute"
+      || computed.position === "fixed"
+      || Boolean(targetStyle.width);
+    if (computed.display === "inline") targetStyle.display = "inline-block";
+    const precisePixel = (value) => `${Math.round(value * 1000) / 1000}px`;
+    if (!fixesWidth) {
+      targetStyle.minWidth = "0";
+      targetStyle.maxWidth = "none";
+    }
+    targetStyle.width = precisePixel(width);
+    targetStyle.height = precisePixel(height);
+    // Keep the local frame isolated so flow siblings never move. Overflow is
+    // marked for the diagnostics panel instead of being silently ignored.
+    if (options.clipOverflow !== false && computed.overflow === "visible") {
+      targetStyle.overflow = "hidden";
+      node.setAttribute("data-chiselo-edit-overflow-warning", "true");
+    }
+    return true;
+  }
+
   function isImageLikeNode(node) {
-    return Boolean(node?.matches?.("img,picture,source"));
+    return isReplaceableImageNode(node) || isImageReferenceNode(node);
+  }
+
+  function isReplaceableImageNode(node) {
+    return Boolean(selectedImageNodeFor(node));
+  }
+
+  function selectedImageNodeFor(node) {
+    if (!node || !node.isConnected) return null;
+    if (node.matches?.("img")) return node;
+    if (node.matches?.("picture")) return node.querySelector?.("img") || null;
+
+    const childImages = [];
+    let hasOtherVisibleChild = false;
+    for (const child of [...node.children || []]) {
+      const image = child.matches?.("img")
+        ? child
+        : child.matches?.("picture")
+          ? child.querySelector?.("img")
+          : null;
+      if (image) {
+        childImages.push(image);
+      } else if (isDirectNodeVisible(child)) {
+        hasOtherVisibleChild = true;
+      }
+    }
+
+    return childImages.length === 1 && !hasOtherVisibleChild && !directOwnText(node)
+      ? childImages[0]
+      : null;
+  }
+
+  function isImageReferenceNode(node) {
+    if (!node || !node.matches || selectedImageNodeFor(node)) return false;
+
+    const token = directImageReferenceToken(node);
+    if (/\b(?:image|img|photo|picture|figure|fig|thumbnail)\b/.test(token)) return true;
+    if (/\b(?:media|asset|preview|placeholder|file|tree|resource|attachment|bibliography|reference)\b/.test(token) && DIRECT_IMAGE_REFERENCE_PATTERN.test(directImageReferenceSource(node))) return true;
+
+    const style = node.ownerDocument.defaultView.getComputedStyle(node);
+    if (style.backgroundImage && style.backgroundImage !== "none" && /url\(/i.test(style.backgroundImage)) return true;
+
+    return false;
+  }
+
+  function directImageReferenceToken(node) {
+    const attributes = [
+      node.id || "",
+      [...node.classList || []].join(" "),
+      node.getAttribute("role") || "",
+      node.getAttribute("aria-label") || "",
+      node.getAttribute("title") || "",
+      node.getAttribute("data-lucide") || "",
+      node.getAttribute("data-icon") || "",
+      node.getAttribute("data-testid") || "",
+      node.getAttribute("data-name") || ""
+    ];
+    return attributes.join(" ").toLowerCase();
+  }
+
+  function directImageReferenceSource(node) {
+    const attributes = [
+      node.getAttribute("src") || "",
+      node.getAttribute("href") || "",
+      node.getAttribute("data-src") || "",
+      node.getAttribute("data-href") || "",
+      node.getAttribute("aria-label") || "",
+      node.getAttribute("title") || "",
+      directOwnText(node)
+    ];
+    const text = attributes.join(" ");
+    let match = text.match(DIRECT_IMAGE_REFERENCE_PATTERN);
+    if (!match && node.querySelectorAll("*").length <= 6) {
+      const subtreeText = normalizedText(node).slice(0, 360);
+      match = subtreeText.match(DIRECT_IMAGE_REFERENCE_PATTERN);
+    }
+    return match ? match[0].trim().replace(/^["'(]+|["')]+$/g, "") : "";
+  }
+
+  function directOwnText(node) {
+    if (!node?.childNodes) return "";
+    return [...node.childNodes]
+      .filter((child) => child.nodeType === Node.TEXT_NODE)
+      .map((child) => child.textContent || "")
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function isDirectNonTextMediaTarget(node) {
@@ -4239,39 +5108,50 @@
   function selectDirectRelative(kind) {
     if (editorMode !== "html" || !directSelectedNode) return;
 
-    const doc = directSelectedNode.ownerDocument;
     let target = null;
 
     if (kind === "parent") {
       target = directSelectedNode.parentElement;
-      if (target === doc.documentElement) target = doc.body;
+      if (isDirectRootNode(target)) target = null;
     }
 
     if (kind === "child") {
-      target = [...directSelectedNode.children].find((node) => isDirectNodeVisible(node)) || directSelectedNode.firstElementChild;
+      target = visibleTreeChildren(directSelectedNode).find((node) => isDirectNavigationNode(node)) || null;
     }
 
     if (kind === "previous") {
       target = directSelectedNode.previousElementSibling;
+      while (target && !isDirectNavigationNode(target)) target = target.previousElementSibling;
     }
 
     if (kind === "next") {
       target = directSelectedNode.nextElementSibling;
+      while (target && !isDirectNavigationNode(target)) target = target.nextElementSibling;
     }
 
-    if (target && target !== doc.documentElement) {
+    if (target && isDirectNavigationNode(target)) {
       selectDirectNode(target);
     }
   }
 
-  function beginDirectDrag(event, node) {
-    event.preventDefault();
-    event.stopPropagation();
+  function isDirectNavigationNode(node) {
+    return Boolean(node && node.nodeType === Node.ELEMENT_NODE && !isDirectRootNode(node)
+      && !isDirectNonEditableElement(node) && isDirectNodeVisible(node));
+  }
+
+  function beginDirectDrag(event, node, options = {}) {
+    if (options.preventDefault !== false) event.preventDefault();
+    if (options.stopPropagation !== false) event.stopPropagation();
     if (!isDirectSelected(node)) {
       selectDirectNode(node);
     }
 
-    pushHistory({ label: "Move object" });
+    if (!directSelectionAllowsGeometry(directSelectionNodes())) {
+      updateSelectionBox();
+      postSelectionChanged({ immediate: true });
+      return;
+    }
+
     const nodes = directSelectionNodes().length > 1 && isDirectSelected(node) ? [...directSelectionNodes()] : [node];
     const startRect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(node);
     const gestureContext = buildDirectGestureContext(nodes);
@@ -4285,25 +5165,30 @@
       startPoint: directPointFromEvent(event),
       startRect,
       lastRect: startRect,
+      hasStarted: false,
       selectionPayloadBase,
       startRects: nodes.map((item) => ({ node: item, rect: gestureContext.rectContexts.get(item)?.startRect || directNodeRect(item) })),
       rectContexts: gestureContext.rectContexts,
-      snapCandidates: gestureContext.snapCandidates
+      snapCandidates: gestureContext.snapCandidates,
+      finishTextEditOnStart: Boolean(options.finishTextEditOnStart)
     };
 
     const doc = node.ownerDocument;
-    doc.addEventListener("pointermove", continueGesture);
-    doc.addEventListener("pointerup", endGesture, { once: true });
+    startGestureListeners(event, doc, document);
   }
 
   function beginDirectResize(event, handle) {
     if (event.button !== 0 || !directSelectedNode) return;
+    if (!directSelectionAllowsGeometry(directSelectionNodes())) return;
     event.preventDefault();
     event.stopPropagation();
     pushHistory({ label: "Resize object" });
     const nodes = directSelectionNodes();
     const startRect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
     const gestureContext = buildDirectGestureContext(nodes);
+    for (const context of gestureContext.rectContexts.values()) {
+      context.forceTransformScaleSize = true;
+    }
     const selectionPayloadBase = directSelectionPayloadBase(nodes, startRect);
 
     activeGesture = {
@@ -4312,7 +5197,7 @@
       node: directSelectedNode,
       nodes,
       handle,
-      startPoint: pointFromEvent(event),
+      startPoint: directPointFromOuterEvent(event),
       startRect,
       lastRect: startRect,
       selectionPayloadBase,
@@ -4322,19 +5207,22 @@
       ratio: startRect.w / startRect.h
     };
 
-    document.addEventListener("pointermove", continueGesture);
-    document.addEventListener("pointerup", endGesture, { once: true });
+    startGestureListeners(event, document, directFrame?.contentDocument);
   }
 
   function continueDirectGesture(event) {
-    const point = event.view === directFrame.contentWindow ? directPointFromEvent(event) : pointFromEvent(event);
-    applyDirectGestureUpdate(point, event.shiftKey);
+    const point = event.view === directFrame.contentWindow ? directPointFromEvent(event) : directPointFromOuterEvent(event);
+    const didApply = applyDirectGestureUpdate(point, event.shiftKey);
+    if (didApply) {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+    }
   }
 
   function applyDirectGestureUpdate(point, shiftKey = false) {
-    if (!activeGesture || !point) return;
+    if (!activeGesture || !point) return false;
     const node = activeGesture.node;
-    if (!node || !node.isConnected) return;
+    if (!node || !node.isConnected) return false;
 
     const dx = point.x - activeGesture.startPoint.x;
     const dy = point.y - activeGesture.startPoint.y;
@@ -4342,6 +5230,15 @@
     let nextRect = activeGesture.startRect;
 
     if (activeGesture.type === "drag") {
+      if (!activeGesture.hasStarted) {
+        if (Math.hypot(dx, dy) < DIRECT_DRAG_START_DISTANCE) return false;
+        activeGesture.hasStarted = true;
+        if (activeGesture.finishTextEditOnStart) {
+          finishActiveDirectTextEdit({ defer: false });
+        }
+        pushHistory({ label: "Move object" });
+        prepareDirectGestureForWrite(gestureNodes.length ? gestureNodes : [node]);
+      }
       nextRect = {
         ...activeGesture.startRect,
         x: activeGesture.startRect.x + dx,
@@ -4356,14 +5253,26 @@
     const activeSet = new Set(gestureNodes.length ? gestureNodes : [node]);
     const snapped = snapDirectRect(nextRect, activeSet, activeGesture.snapCandidates);
     activeGesture.lastRect = snapped.rect;
-    if (gestureNodes.length > 1) {
-      applyDirectGroupRects(activeGesture.startRects, activeGesture.startRect, snapped.rect, activeGesture.rectContexts);
-    } else {
-      applyDirectRect(node, snapped.rect, activeGesture.rectContexts?.get(node));
-    }
+    withSuppressedDirectMutationRefresh(() => {
+      if (gestureNodes.length > 1) {
+        applyDirectGroupRects(activeGesture.startRects, activeGesture.startRect, snapped.rect, activeGesture.rectContexts);
+      } else {
+        applyDirectRect(node, snapped.rect, activeGesture.rectContexts?.get(node));
+      }
+    });
     showGuides(snapped.guides);
     scheduleSelectionBoxUpdate();
     postSelectionChanged();
+    activeGesture.handledOwnLayout = true;
+    return true;
+  }
+
+  function prepareDirectGestureForWrite(nodes) {
+    const activeSet = new Set((nodes || []).filter((item) => item?.isConnected));
+    for (const item of activeSet) {
+      if (!activeGesture?.rectContexts?.has(item)) continue;
+      activeGesture.rectContexts.set(item, directRectContext(item, activeSet));
+    }
   }
 
   function directPointFromEvent(event) {
@@ -4371,6 +5280,17 @@
     return {
       x: event.clientX + (win?.scrollX || 0),
       y: event.clientY + (win?.scrollY || 0)
+    };
+  }
+
+  function directPointFromOuterEvent(event) {
+    const frameRect = directFrame?.getBoundingClientRect?.();
+    const win = directFrame?.contentWindow;
+    if (!frameRect) return pointFromEvent(event);
+    const effectiveScale = Math.max(scale, 0.05);
+    return {
+      x: (event.clientX - frameRect.left) / effectiveScale + (win?.scrollX || 0),
+      y: (event.clientY - frameRect.top) / effectiveScale + (win?.scrollY || 0)
     };
   }
 
@@ -4384,6 +5304,51 @@
       h: Math.round(rect.height),
       rotation: 0
     };
+  }
+
+  function directFrameScreenRect(rect) {
+    const frameRect = directFrame?.getBoundingClientRect?.();
+    const win = directFrame?.contentWindow;
+    if (!frameRect || !win?.innerWidth || !win?.innerHeight) return null;
+
+    return {
+      left: frameRect.left + (rect.x - (win.scrollX || 0)) * frameRect.width / win.innerWidth,
+      top: frameRect.top + (rect.y - (win.scrollY || 0)) * frameRect.height / win.innerHeight,
+      width: rect.w * frameRect.width / win.innerWidth,
+      height: rect.h * frameRect.height / win.innerHeight
+    };
+  }
+
+  function alignDirectOverlayBox(overlay, rect) {
+    overlay.style.left = `${rect.x}px`;
+    overlay.style.top = `${rect.y}px`;
+    overlay.style.width = `${rect.w}px`;
+    overlay.style.height = `${rect.h}px`;
+
+    const expected = directFrameScreenRect(rect);
+    if (!expected) return rect;
+
+    const actual = overlay.getBoundingClientRect();
+    const scaleX = rect.w > 0 ? actual.width / rect.w : scale;
+    const scaleY = rect.h > 0 ? actual.height / rect.h : scale;
+    if (!(scaleX > 0) || !(scaleY > 0)) return rect;
+
+    const aligned = {
+      ...rect,
+      x: rect.x + (expected.left - actual.left) / scaleX,
+      y: rect.y + (expected.top - actual.top) / scaleY,
+      w: expected.width / scaleX,
+      h: expected.height / scaleY
+    };
+    overlay.style.left = `${aligned.x}px`;
+    overlay.style.top = `${aligned.y}px`;
+    overlay.style.width = `${aligned.w}px`;
+    overlay.style.height = `${aligned.h}px`;
+    return aligned;
+  }
+
+  function alignDirectSelectionBox(rect) {
+    return alignDirectOverlayBox(selectionBox, rect);
   }
 
   function directNodesBounds(nodes) {
@@ -4412,7 +5377,7 @@
     const rectContexts = new Map();
 
     for (const node of activeSet) {
-      rectContexts.set(node, directRectContext(node, activeSet));
+      rectContexts.set(node, directRectContext(node, activeSet, { prepareTransform: false }));
     }
 
     return {
@@ -4421,15 +5386,17 @@
     };
   }
 
-  function directRectContext(node, activeSet) {
+  function directRectContext(node, activeSet, options = {}) {
     const startRect = directNodeRect(node);
     const anchor = positionedAncestor(node);
     const selectedAncestor = directSelectedAncestor(node, activeSet);
 
-    if (directLayoutMode === "transform" && !node.dataset.chiseloBaseTransform) {
+    if (options.prepareTransform !== false && directLayoutMode === "transform" && !node.dataset.chiseloBaseTransform) {
       node.dataset.chiseloBaseTransform = node.style.transform || "none";
       node.dataset.chiseloTranslateX = "0";
       node.dataset.chiseloTranslateY = "0";
+      node.dataset.chiseloScaleX = "1";
+      node.dataset.chiseloScaleY = "1";
     }
 
     return {
@@ -4440,7 +5407,9 @@
       canUseTransformCache: !selectedAncestor,
       baseTransform: node.dataset.chiseloBaseTransform || node.style.transform || "none",
       translateX: Number(node.dataset.chiseloTranslateX || 0),
-      translateY: Number(node.dataset.chiseloTranslateY || 0)
+      translateY: Number(node.dataset.chiseloTranslateY || 0),
+      scaleX: Number(node.dataset.chiseloScaleX || 1),
+      scaleY: Number(node.dataset.chiseloScaleY || 1)
     };
   }
 
@@ -4506,6 +5475,7 @@
   }
 
   function applyDirectRect(node, rect, context = null) {
+    if (!directNodeAllowsGeometry(node)) return;
     if (directLayoutMode === "transform") {
       applyDirectTransformRect(node, rect, context);
       return;
@@ -4549,6 +5519,8 @@
       node.dataset.chiseloBaseTransform = node.style.transform || "none";
       node.dataset.chiseloTranslateX = "0";
       node.dataset.chiseloTranslateY = "0";
+      node.dataset.chiseloScaleX = "1";
+      node.dataset.chiseloScaleY = "1";
     }
 
     const useCache = context?.canUseTransformCache && context.startRect;
@@ -4563,33 +5535,195 @@
     const base = baseTransform === "none" ? "" : baseTransform;
     const baselineRect = useCache ? context.startRect : currentRect;
     const sizeChanged = Math.abs(rect.w - baselineRect.w) > 1 || Math.abs(rect.h - baselineRect.h) > 1;
-    const canWriteSize = sizeChanged && !directShouldPreserveFlowSize(node);
+    const shouldScaleSize = sizeChanged && (context?.forceTransformScaleSize || directShouldPreserveFlowSize(node));
+    const canWriteSize = sizeChanged && !shouldScaleSize;
+    const scaleX = shouldScaleSize && baselineRect.w
+      ? (useCache ? context.scaleX : Number(node.dataset.chiseloScaleX || 1)) * (rect.w / baselineRect.w)
+      : Number(node.dataset.chiseloScaleX || context?.scaleX || 1);
+    const scaleY = shouldScaleSize && baselineRect.h
+      ? (useCache ? context.scaleY : Number(node.dataset.chiseloScaleY || 1)) * (rect.h / baselineRect.h)
+      : Number(node.dataset.chiseloScaleY || context?.scaleY || 1);
 
     node.dataset.chiseloTranslateX = String(Math.round(tx));
     node.dataset.chiseloTranslateY = String(Math.round(ty));
+    node.dataset.chiseloScaleX = String(clampNumber(scaleX, 0.05, 20));
+    node.dataset.chiseloScaleY = String(clampNumber(scaleY, 0.05, 20));
     node.style.boxSizing = "border-box";
+    if (directNeedsTransformableDisplay(node)) {
+      node.style.display = "inline-block";
+    }
     if (canWriteSize) {
       node.style.width = `${Math.max(MIN_SIZE, Math.round(rect.w))}px`;
       node.style.height = `${Math.max(MIN_SIZE, Math.round(rect.h))}px`;
     }
-    node.style.transform = `${base} translate(${Math.round(tx)}px, ${Math.round(ty)}px)`.trim();
+    const scalePart = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
+      ? ` scale(${formatTransformNumber(scaleX)}, ${formatTransformNumber(scaleY)})`
+      : "";
+    if (scalePart) node.style.transformOrigin = "top left";
+    node.style.transform = `${base} translate(${Math.round(tx)}px, ${Math.round(ty)}px)${scalePart}`.trim();
+  }
+
+  function directNeedsTransformableDisplay(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+    const display = node.ownerDocument.defaultView.getComputedStyle(node).display;
+    return display === "inline";
   }
 
   function directShouldPreserveFlowSize(node) {
     if (!node || node.nodeType !== Node.ELEMENT_NODE || node.matches?.("html,body")) return false;
+    if (directGeometryLockedNode(node)) return true;
+    const style = node.ownerDocument.defaultView.getComputedStyle(node);
+    if (style.position === "absolute" || style.position === "fixed") return false;
+    return true;
+  }
+
+  function directGeometryLockedNode(node) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE || !node.matches) return false;
+    return node.matches("td,th,tr,thead,tbody,tfoot,caption")
+      || Boolean(node.closest("td,th") && !node.matches("table"));
+  }
+
+  function directNodeAllowsGeometry(node) {
+    return Boolean(node?.isConnected) && !isDirectRootNode(node)
+      && !isDirectNonEditableElement(node) && !directGeometryLockedNode(node);
+  }
+
+  function directSelectionAllowsGeometry(nodes = directSelectionNodes()) {
+    const selected = (nodes || []).filter((node) => node?.isConnected);
+    return selected.length > 0 && selected.every(directNodeAllowsGeometry);
+  }
+
+  function directGeometryLockReason(node) {
+    if (!directGeometryLockedNode(node)) return null;
+    return "This object is inside a table. You can edit text and styles or use row, column, and cell operations. Select the complete table before moving it to prevent table layout from clipping cell text.";
+  }
+
+  function directEditSafetyForNode(node, options = {}) {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return {};
+
+    const targetId = ensureDirectId(node);
+    const imageReference = Boolean(options.imageReference);
+    if (imageReference) {
+      return {
+        editSafetyLevel: "caution",
+        editSafetyTitle: "Image Reference",
+        editSafetyDetail: "This is an HTML image path or placeholder, not an independent <img> node. Confirm the source location before replacing the image.",
+        editSafetyOperations: ["Locate Source", "Change Path", "Insert Real Image"],
+        editSafetyTargetId: targetId,
+        editSafetyContainerId: null
+      };
+    }
+
+    if (directGeometryLockedNode(node)) {
+      const table = node.closest("table");
+      return {
+        editSafetyLevel: "locked",
+        editSafetyTitle: "Table-Internal Object",
+        editSafetyDetail: directGeometryLockReason(node),
+        editSafetyOperations: ["Edit Text", "Edit Style", "Cell Style", "Select Whole Table to Move"],
+        editSafetyTargetId: targetId,
+        editSafetyContainerId: table ? ensureDirectId(table) : null
+      };
+    }
+
+    const clipFrame = clippingFrameNodeFor(node, { includeScroll: true });
+    if (clipFrame) {
+      const frame = diagnosticFrameForClipNode(clipFrame);
+      const rect = directNodeRect(node);
+      const overflow = rectOverflowAmount(rect, frame);
+      const containerId = ensureDirectId(clipFrame);
+      if (overflow > 4) {
+        return {
+          editSafetyLevel: "danger",
+          editSafetyTitle: "Object Clipped by Parent",
+          editSafetyDetail: `The current object extends ${Math.round(overflow)}px beyond the visible parent boundary. Check the parent overflow before dragging to prevent text or shapes from being clipped.`,
+          editSafetyOperations: ["Locate Object", "Locate Parent", "Adjust Parent", "Move Inside Boundary"],
+          editSafetyTargetId: targetId,
+          editSafetyContainerId: containerId
+        };
+      }
+
+      if (hasContainerOverflowContent(clipFrame)) {
+        return {
+          editSafetyLevel: "caution",
+          editSafetyTitle: "Object in a Clipping Container",
+          editSafetyDetail: "The parent container has an overflow or scrolling boundary. Confirm that the object remains visible after moving it.",
+          editSafetyOperations: ["Review After Moving", "Locate Parent", "Check Boundary"],
+          editSafetyTargetId: targetId,
+          editSafetyContainerId: containerId
+        };
+      }
+    }
+
+    const layoutSafety = directLayoutManagedSafetyForNode(node, targetId);
+    if (layoutSafety) return layoutSafety;
+
+    if (node.matches?.("table")) {
+      return {
+        editSafetyLevel: "caution",
+        editSafetyTitle: "Whole Table",
+        editSafetyDetail: "You can move and resize the complete table. Edit cell text and styles with the table tools to protect the row and column structure.",
+        editSafetyOperations: ["Move Whole Table", "Resize Whole Table", "Edit Cells", "Review After Export"],
+        editSafetyTargetId: targetId,
+        editSafetyContainerId: null
+      };
+    }
+
+    return {
+      editSafetyLevel: "free",
+      editSafetyTitle: "Direct Editing Available",
+      editSafetyDetail: "You can move, resize, edit text, and change styles. Changes apply only to the selected object.",
+      editSafetyOperations: ["Move", "Resize", "Edit Text", "Edit Style"],
+      editSafetyTargetId: targetId,
+      editSafetyContainerId: null
+    };
+  }
+
+  function directLayoutManagedSafetyForNode(node, targetId) {
+    if (!node || node.matches?.("html,body")) return null;
+
     const win = node.ownerDocument.defaultView;
     const style = win.getComputedStyle(node);
-    const parentStyle = node.parentElement ? win.getComputedStyle(node.parentElement) : null;
-    const display = String(style.display || "");
+    const parent = node.parentElement;
+    const parentStyle = parent ? win.getComputedStyle(parent) : null;
     const parentDisplay = String(parentStyle?.display || "");
-    const containerType = String(style.containerType || "normal");
-    if (style.position === "absolute" || style.position === "fixed") return false;
-    return display.includes("flex")
-      || display.includes("grid")
-      || parentDisplay.includes("flex")
-      || parentDisplay.includes("grid")
-      || containerType !== "normal"
-      || style.position === "sticky";
+    const display = String(style.display || "");
+
+    if (parentDisplay.includes("grid") || parentDisplay.includes("flex")) {
+      const layoutLabel = parentDisplay.includes("grid") ? "grid" : "flex";
+      return {
+        editSafetyLevel: "caution",
+        editSafetyTitle: "Layout-Managed Object",
+        editSafetyDetail: `The parent uses a ${layoutLabel} layout. Dragging converts the current object to independent geometry. Check objects in the same group and responsive widths after editing.`,
+        editSafetyOperations: ["Edit Text", "Edit Style", "Select Parent", "Review Multiple Widths"],
+        editSafetyTargetId: targetId,
+        editSafetyContainerId: parent ? ensureDirectId(parent) : null
+      };
+    }
+
+    if (style.position === "sticky") {
+      return {
+        editSafetyLevel: "caution",
+        editSafetyTitle: "Sticky-Positioned Object",
+        editSafetyDetail: "This object uses sticky positioning. Check its scroll state and export position after moving it.",
+        editSafetyOperations: ["Move Carefully", "Check Scrolling", "Review Export"],
+        editSafetyTargetId: targetId,
+        editSafetyContainerId: parent ? ensureDirectId(parent) : null
+      };
+    }
+
+    if (display.includes("table")) {
+      return {
+        editSafetyLevel: "caution",
+        editSafetyTitle: "Table Layout Object",
+        editSafetyDetail: "Table display rules manage this object. Edit text and styles first. Confirm the parent layout before moving it.",
+        editSafetyOperations: ["Edit Text", "Edit Style", "Select Parent"],
+        editSafetyTargetId: targetId,
+        editSafetyContainerId: parent ? ensureDirectId(parent) : null
+      };
+    }
+
+    return null;
   }
 
   function positionedAncestor(node) {
@@ -4649,9 +5783,9 @@
 
   function beginDirectTextEdit(node) {
     if (!node || !directNodeAllowsTextEdit(node)) return null;
+    finishActiveDirectTextEdit({ defer: false });
     pendingDirectTextEditNode = null;
     selectDirectNode(node);
-    pushHistory({ label: "Edit text" });
     activeDirectTextEditNode = node;
     const unlockTypography = lockDirectEditTypography(node);
     markDirectEditAttribute(node, "contenteditable", "data-chiselo-edit-contenteditable");
@@ -4659,6 +5793,8 @@
     node.setAttribute("contenteditable", "true");
     node.setAttribute("spellcheck", "true");
     node.focus();
+    directTextEditSelectionRect = directNodeRect(node);
+    updateSelectionBox();
 
     selectDirectTextContents(node);
     node.ownerDocument.defaultView.requestAnimationFrame(() => selectDirectTextContents(node));
@@ -4668,33 +5804,82 @@
       }
     }, 80);
 
-    const finish = () => {
-      if (activeDirectTextEditNode === node) activeDirectTextEditNode = null;
-      restoreDirectEditAttribute(node, "contenteditable", "data-chiselo-edit-contenteditable");
-      restoreDirectEditAttribute(node, "spellcheck", "data-chiselo-edit-spellcheck");
-      unlockTypography();
+    let didFinish = false;
+    let didPushHistory = false;
+    const handleBeforeInput = () => {
+      if (didPushHistory) return;
+      didPushHistory = true;
+      pushHistory({ label: "Edit text" });
+      lockDirectLocalEditFrame(node);
+    };
+    node.addEventListener("beforeinput", handleBeforeInput);
+    const finish = (options = {}) => {
+      if (didFinish) return;
+      didFinish = true;
+      pendingDirectTextEditNode = null;
+      if (activeDirectTextEditFinish === finish) activeDirectTextEditFinish = null;
       node.removeEventListener("blur", finish);
       node.removeEventListener("keydown", handleEditingKeydown);
-      scheduleHTMLTreeChanged();
-      scheduleHTMLDiagnosticsChanged();
-      postSelectionChanged();
+      node.removeEventListener("beforeinput", handleBeforeInput);
+      const complete = () => {
+        if (activeDirectTextEditNode === node) activeDirectTextEditNode = null;
+        restoreDirectEditAttribute(node, "contenteditable", "data-chiselo-edit-contenteditable");
+        restoreDirectEditAttribute(node, "spellcheck", "data-chiselo-edit-spellcheck");
+        unlockTypography();
+        clearDirectNativeSelection(node.ownerDocument);
+        if (node.isConnected) {
+          scheduleHTMLTreeChanged();
+          scheduleHTMLDiagnosticsChanged();
+          directTextEditSelectionRect = null;
+          scheduleDirectLayoutRefresh();
+        } else {
+          directTextEditSelectionRect = null;
+        }
+        postSelectionChanged();
+      };
+      if (options.defer === false) complete();
+      else setTimeout(complete, 0);
     };
 
     const handleEditingKeydown = (event) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
-        node.blur();
+        finish();
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        node.blur();
+        finish();
       }
     };
 
     node.addEventListener("blur", finish);
     node.addEventListener("keydown", handleEditingKeydown);
+    activeDirectTextEditFinish = finish;
     postSelectionChanged();
     return node;
+  }
+
+  function finishActiveDirectTextEdit(options = {}) {
+    if (activeDirectTextEditFinish) {
+      activeDirectTextEditFinish(options);
+      return true;
+    }
+
+    pendingDirectTextEditNode = null;
+    const node = activeDirectTextEditNode;
+    activeDirectTextEditNode = null;
+    if (node?.isConnected) {
+      node.blur?.();
+      clearDirectNativeSelection(node.ownerDocument);
+      postSelectionChanged();
+      return true;
+    }
+    return false;
+  }
+
+  function clearDirectNativeSelection(doc) {
+    const selection = doc?.defaultView?.getSelection?.();
+    if (selection?.removeAllRanges) selection.removeAllRanges();
   }
 
   function markDirectEditAttribute(node, attributeName, markerName) {
@@ -4745,19 +5930,32 @@
     }
 
     if (!directSelectedNode || !directSelectedNode.isConnected) return;
+    const styleTarget = directStylesheetWriteTarget(directSelectedNode, nextElement.style || {});
     pushHistory({ label: "Adjust object", coalesceKey: directHistoryCoalesceKey("direct-update", nodes), interval: 800 });
-    if (directElementHasGeometryUpdate(directSelectedNode, nextElement)) {
-      applyDirectRect(directSelectedNode, nextElement);
-    }
-    applyDirectStyle(directSelectedNode, nextElement.style || {});
-    applyDirectImageMetadata(directSelectedNode, nextElement);
+    withSuppressedDirectMutationRefresh(() => {
+      if (directEditCanAffectLocalFrame(directSelectedNode, nextElement)) {
+        lockDirectLocalEditFrame(directSelectedNode, { styleTarget });
+      }
+      if (directNodeAllowsGeometry(directSelectedNode)) {
+        const nextRect = directElementUpdateRect(directSelectedNode, nextElement);
+        if (nextRect) {
+          applyDirectRect(directSelectedNode, nextRect);
+        }
+      }
+      const textChanged = applyDirectTextContent(directSelectedNode, nextElement);
+      applyDirectStyle(directSelectedNode, nextElement.style || {}, styleTarget);
+      applyDirectImageMetadata(directSelectedNode, nextElement);
+      if (textChanged) scheduleHTMLTreeChanged();
+    });
     updateSelectionBox();
-    scheduleHTMLDiagnosticsChanged();
+    updateDirectSelectionPayloadCache(nextElement);
     postSelectionChanged();
   }
 
   function updateDirectGroupElement(nodes, nextElement) {
     if (!nodes.length) return;
+    if (!directSelectionAllowsGeometry(nodes)) return;
+    clearDirectSelectionPayloadCache();
 
     pushHistory({ label: "Adjust object group", coalesceKey: directHistoryCoalesceKey("direct-group-update", nodes), interval: 800 });
     const currentRect = directNodesBounds(nodes);
@@ -4769,24 +5967,28 @@
     };
     if (directRectChanged(currentRect, nextRect)) {
       const startRects = nodes.map((node) => ({ node, rect: directNodeRect(node) }));
-      applyDirectGroupRects(startRects, currentRect, nextRect);
+      withSuppressedDirectMutationRefresh(() => {
+        applyDirectGroupRects(startRects, currentRect, nextRect);
+      });
     }
 
     if (nextElement.style) {
-      for (const node of nodes) {
-        applyDirectStyle(node, nextElement.style);
-      }
+      withSuppressedDirectMutationRefresh(() => {
+        for (const node of nodes) {
+          applyDirectStyle(node, nextElement.style);
+        }
+      });
     }
 
     updateSelectionBox();
-    scheduleHTMLDiagnosticsChanged();
     postSelectionChanged();
   }
 
-  function directElementHasGeometryUpdate(node, nextElement) {
-    if (!node || !nextElement) return false;
+  function directElementUpdateRect(node, nextElement) {
+    if (!node || !nextElement) return null;
+    if (!directNodeAllowsGeometry(node)) return null;
     const hasGeometryInput = ["x", "y", "w", "h"].some((key) => Number.isFinite(Number(nextElement[key])));
-    if (!hasGeometryInput) return false;
+    if (!hasGeometryInput) return null;
     const currentRect = directNodeRect(node);
     const nextRect = {
       x: Number.isFinite(Number(nextElement.x)) ? Number(nextElement.x) : currentRect.x,
@@ -4794,18 +5996,18 @@
       w: Number.isFinite(Number(nextElement.w)) ? Number(nextElement.w) : currentRect.w,
       h: Number.isFinite(Number(nextElement.h)) ? Number(nextElement.h) : currentRect.h
     };
-    return directRectChanged(currentRect, nextRect);
+    return directRectChanged(currentRect, nextRect) ? nextRect : null;
   }
 
-  function directRectChanged(left, right) {
-    return Math.abs((left?.x || 0) - (right?.x || 0)) > 0.5
-      || Math.abs((left?.y || 0) - (right?.y || 0)) > 0.5
-      || Math.abs((left?.w || 0) - (right?.w || 0)) > 0.5
-      || Math.abs((left?.h || 0) - (right?.h || 0)) > 0.5;
+  function applyDirectTextContent(node, nextElement) {
+    if (!node || !nextElement || typeof nextElement.text !== "string") return false;
+    if (nextElement.text === normalizedText(node)) return false;
+    node.textContent = nextElement.text;
+    return true;
   }
 
-  function applyDirectStyle(node, style) {
-    const styleTarget = directStylesheetWriteTarget(node, style);
+  function applyDirectStyle(node, style, preferredStyleTarget = null) {
+    const styleTarget = preferredStyleTarget || directStylesheetWriteTarget(node, style);
     const targetStyle = styleTarget?.style || node.style;
     if (styleTarget?.style) directStylesheetWritebackCount += 1;
 
@@ -4835,12 +6037,43 @@
         (imageTarget?.style || image.style).objectFit = objectFitValue(style.objectFit, "cover");
       }
     }
+
+    // Box model
+    if (Number.isFinite(style.paddingTop)) targetStyle.paddingTop = `${Math.max(0, style.paddingTop)}px`;
+    if (Number.isFinite(style.paddingRight)) targetStyle.paddingRight = `${Math.max(0, style.paddingRight)}px`;
+    if (Number.isFinite(style.paddingBottom)) targetStyle.paddingBottom = `${Math.max(0, style.paddingBottom)}px`;
+    if (Number.isFinite(style.paddingLeft)) targetStyle.paddingLeft = `${Math.max(0, style.paddingLeft)}px`;
+    if (Number.isFinite(style.marginTop)) targetStyle.marginTop = `${style.marginTop}px`;
+    if (Number.isFinite(style.marginRight)) targetStyle.marginRight = `${style.marginRight}px`;
+    if (Number.isFinite(style.marginBottom)) targetStyle.marginBottom = `${style.marginBottom}px`;
+    if (Number.isFinite(style.marginLeft)) targetStyle.marginLeft = `${style.marginLeft}px`;
+
+    // Layout
+    if (style.display) targetStyle.display = style.display;
+    if (style.flexDirection) targetStyle.flexDirection = style.flexDirection;
+    if (style.justifyContent) targetStyle.justifyContent = style.justifyContent;
+    if (style.alignItems) targetStyle.alignItems = style.alignItems;
+    if (Number.isFinite(style.gap)) targetStyle.gap = `${Math.max(0, style.gap)}px`;
+    if (style.flexWrap) targetStyle.flexWrap = style.flexWrap;
+
+    // Position & misc
+    if (style.position) targetStyle.position = style.position;
+    if (style.overflow) targetStyle.overflow = style.overflow;
+    if (Number.isFinite(style.opacity)) targetStyle.opacity = `${Math.max(0, Math.min(1, style.opacity))}`;
+    if (Number.isFinite(style.letterSpacing)) targetStyle.letterSpacing = `${style.letterSpacing}px`;
+    if (style.textDecoration) targetStyle.textDecoration = style.textDecoration;
+    if (style.textTransform) targetStyle.textTransform = style.textTransform;
+    if (style.whiteSpace) targetStyle.whiteSpace = style.whiteSpace;
   }
 
   function directStylesheetWriteTarget(node, style) {
     if (!node || !style || !shouldPreferStylesheetWriteback(node, style)) return null;
     const match = uniqueDirectStylesheetRule(node);
-    return match ? { style: match.rule.style, selector: match.selector } : null;
+    return match ? {
+      style: match.rule.style,
+      selector: match.selector,
+      sheetInfo: match.sheetInfo
+    } : null;
   }
 
   function directStyleWritebackPreview(node) {
@@ -4850,17 +6083,34 @@
         writebackKind: "inline-style",
         writebackLabel: "inline style",
         writebackTarget: "style",
-        writebackDetail: "This object already has an inline style, so style changes keep going onto the object itself."
+        writebackDetail: "The current object already has an inline style. Style changes will continue to be written to this object.",
+        writebackSourceKind: "inline-style",
+        writebackSourceLabel: "Current Object",
+        writebackSourceURL: "",
+        writebackRuleSnippet: "",
+        writebackRuleLine: null
       };
     }
 
-    const selector = uniqueDirectStylesheetRule(node)?.selector || null;
-    if (selector) {
+    const match = uniqueDirectStylesheetRule(node);
+    if (match?.selector) {
+      const selector = match.selector;
+      const detail = match.sheetInfo.ownerKind === "linked-local"
+        ? `Safe style changes will be written back to rule ${selector} in local CSS file ${match.sheetInfo.label}.`
+        : `Safe style changes will be written back to local CSS rule ${selector}.`;
+      const locator = directStylesheetRuleLocator(match);
+      const matchSummary = stylesheetRuleMatchSummary(node.ownerDocument, selector);
       return {
         writebackKind: "stylesheet-rule",
         writebackLabel: "CSS rule",
         writebackTarget: selector,
-        writebackDetail: `Safe style changes are written back to the local CSS rule ${selector} first.`
+        writebackDetail: detail,
+        writebackSourceKind: match.sheetInfo.ownerKind,
+        writebackSourceLabel: match.sheetInfo.label || "",
+        writebackSourceURL: locator.sourceURL,
+        writebackRuleSnippet: locator.ruleSnippet,
+        writebackRuleLine: locator.ruleLine,
+        writebackMatchSummary: matchSummary
       };
     }
 
@@ -4870,10 +6120,72 @@
       writebackKind: "inline-style",
       writebackLabel: "inline style",
       writebackTarget: "style",
+      writebackSourceKind: "inline-style",
+      writebackSourceLabel: "Current Object",
+      writebackSourceURL: "",
+      writebackRuleSnippet: "",
+      writebackRuleLine: null,
       writebackDetail: classCount > 0 || id
         ? "No local CSS rule matches only this object, so style changes go to the object inline style to avoid altering similar objects by mistake."
         : "This object has no stable unique CSS rule, so style changes go to the object inline style."
     };
+  }
+
+  function directStylesheetRuleLocator(match) {
+    const ruleSnippet = stylesheetRuleSnippet(match);
+    const sourceText = stylesheetRuleSourceText(match);
+    const ruleLine = stylesheetRuleLineNumber(sourceText, ruleSnippet, match.selector);
+    return {
+      sourceURL: match.sheetInfo?.ownerKind === "linked-local" ? (match.sheetInfo.fileURL || "") : "",
+      ruleSnippet,
+      ruleLine
+    };
+  }
+
+  function stylesheetRuleSnippet(match) {
+    const selector = String(match?.selector || "").trim();
+    const styleText = String(match?.rule?.style?.cssText || "").trim();
+    if (!selector || !styleText) return "";
+    return `${selector} { ${styleText} }`;
+  }
+
+  function stylesheetRuleSourceText(match) {
+    const ownerNode = match?.rule?.parentStyleSheet?.ownerNode;
+    return String(ownerNode?.textContent || "");
+  }
+
+  function stylesheetRuleLineNumber(sourceText, ruleSnippet, selector) {
+    const source = String(sourceText || "");
+    if (!source) return null;
+    const preferredNeedle = String(ruleSnippet || "").trim();
+    const fallbackNeedle = String(selector || "").trim();
+    const needle = preferredNeedle && source.includes(preferredNeedle)
+      ? preferredNeedle
+      : (fallbackNeedle && source.includes(fallbackNeedle) ? fallbackNeedle : "");
+    if (!needle) return null;
+    const index = source.indexOf(needle);
+    if (index < 0) return null;
+    return source.slice(0, index).split(/\r\n|\r|\n/).length;
+  }
+
+  function stylesheetRuleMatchSummary(doc, selector) {
+    try {
+      const nodes = [...doc.querySelectorAll(selector)]
+        .filter((node) => node?.nodeType === Node.ELEMENT_NODE)
+        .filter((node) => !isDirectNonEditableElement(node))
+        .filter((node) => isDirectNodeVisible(node));
+      return {
+        selector,
+        count: nodes.length,
+        items: nodes.slice(0, 8).map((node) => directSourceNodeItem(node, 0))
+      };
+    } catch {
+      return {
+        selector,
+        count: 0,
+        items: []
+      };
+    }
   }
 
   function shouldPreferStylesheetWriteback(node, style) {
@@ -4889,11 +6201,15 @@
 
   function uniqueDirectStylesheetRule(node) {
     const matches = [];
-    for (const rule of localDirectStyleRules(node.ownerDocument)) {
-      const selector = String(rule.selectorText || "").trim();
+    for (const entry of localDirectStyleRules(node.ownerDocument)) {
+      const selector = String(entry.selector || "").trim();
       if (!isSafeDirectStylesheetSelector(selector)) continue;
       if (!directRuleUniquelyTargetsNode(node, selector)) continue;
-      matches.push({ rule, selector });
+      matches.push({
+        rule: entry.rule,
+        selector,
+        sheetInfo: entry.sheetInfo
+      });
     }
 
     return matches.length === 1 ? matches[0] : null;
@@ -4926,15 +6242,64 @@
 
   function localDirectStyleRules(doc) {
     const output = [];
+    let inlineStyleIndex = 0;
     for (const sheet of doc.styleSheets || []) {
-      if (!sheet.ownerNode || sheet.ownerNode.hasAttribute?.("data-chiselo-style")) continue;
-      if (sheet.ownerNode.tagName?.toLowerCase() !== "style") continue;
-      collectDirectStyleRules(sheet, output);
+      const sheetInfo = directEditableStylesheetInfo(sheet, doc, inlineStyleIndex);
+      if (!sheetInfo) continue;
+      if (sheetInfo.ownerKind === "inline-style") inlineStyleIndex += 1;
+      collectDirectStyleRules(sheet, output, sheetInfo);
     }
     return output;
   }
 
-  function collectDirectStyleRules(container, output) {
+  function directEditableStylesheetInfo(sheet, doc, inlineStyleIndex = 0) {
+    const ownerNode = sheet?.ownerNode;
+    const tagName = ownerNode.tagName?.toLowerCase?.() || "";
+    if (ownerNode?.hasAttribute?.("data-chiselo-style")) return null;
+    if (ownerNode && tagName === "style") {
+      const mirroredFileURL = String(ownerNode.getAttribute("data-chiselo-linked-stylesheet-file") || "").trim();
+      if (mirroredFileURL) {
+        const href = String(ownerNode.getAttribute("data-chiselo-linked-stylesheet") || "").trim();
+        return {
+          key: `link:${mirroredFileURL}`,
+          ownerKind: "linked-local",
+          href,
+          fileURL: mirroredFileURL,
+          label: href || mirroredFileURL
+        };
+      }
+      return {
+        key: `style:${inlineStyleIndex + 1}`,
+        ownerKind: "inline-style",
+        href: "",
+        fileURL: "",
+        label: `<style #${inlineStyleIndex + 1}>`
+      };
+    }
+    const href = String(ownerNode?.getAttribute?.("href") || sheet?.href || "").trim();
+    const fileURL = resolvedDirectLocalStylesheetURL(href, doc);
+    if (!fileURL) return null;
+    return {
+      key: `link:${fileURL}`,
+      ownerKind: "linked-local",
+      href,
+      fileURL,
+      label: href || fileURL
+    };
+  }
+
+  function resolvedDirectLocalStylesheetURL(href, doc) {
+    if (!href) return null;
+    try {
+      const url = new URL(href, directBaseHref || doc.baseURI);
+      if (url.protocol !== "file:") return null;
+      return url.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  function collectDirectStyleRules(container, output, sheetInfo) {
     let rules = [];
     try {
       rules = [...(container.cssRules || [])];
@@ -4943,15 +6308,39 @@
     }
     for (const rule of rules) {
       if (rule.type === CSSRule.STYLE_RULE) {
-        output.push(rule);
+        output.push({
+          rule,
+          selector: String(rule.selectorText || "").trim(),
+          sheetInfo
+        });
       }
     }
   }
 
+  function localLinkedDirectStylesheets(doc) {
+    const output = [];
+    const seen = new Set();
+    let inlineStyleIndex = 0;
+    for (const sheet of doc.styleSheets || []) {
+      const sheetInfo = directEditableStylesheetInfo(sheet, doc, inlineStyleIndex);
+      if (!sheetInfo) continue;
+      if (sheetInfo.ownerKind === "inline-style") {
+        inlineStyleIndex += 1;
+        continue;
+      }
+      const cssText = serializedDirectStylesheet(sheet).trim();
+      if (!cssText || !sheetInfo.fileURL || seen.has(sheetInfo.fileURL)) continue;
+      seen.add(sheetInfo.fileURL);
+      output.push({ sheetInfo, cssText });
+    }
+    return output;
+  }
+
   function applyDirectImageMetadata(node, nextElement) {
-    if (!node.matches?.("img")) return;
-    if (typeof nextElement.imageSource === "string") node.setAttribute("src", nextElement.imageSource);
-    if (typeof nextElement.imageAlt === "string") node.setAttribute("alt", nextElement.imageAlt);
+    const image = selectedImageNodeFor(node);
+    if (!image) return;
+    if (typeof nextElement.imageSource === "string") image.setAttribute("src", nextElement.imageSource);
+    if (typeof nextElement.imageAlt === "string") image.setAttribute("alt", nextElement.imageAlt);
   }
 
   function findDirectNodeByVisualChangeKey(key, entry = null) {
@@ -5014,6 +6403,7 @@
     delete node.dataset.chiseloBaseTransform;
     delete node.dataset.chiseloTranslateX;
     delete node.dataset.chiseloTranslateY;
+    delete node.dataset.chiseloLocalFrameLocked;
   }
 
   function revertVisualChange(changeKey) {
@@ -5066,6 +6456,15 @@
       selectDirectNode(restoredDeletedNode);
     } else if (kind === "文字") {
       node.textContent = before.text || "";
+      if (visualChangeIsLocalFrameStabilityOnly(before, after)) {
+        if (before.styleAttr !== after.styleAttr) {
+          restoreDirectStyleAttribute(node, before.styleAttr || "");
+        }
+        if (visualStylesheetRuleDiffers(before, after) && !restoreDirectStylesheetRule(node, before, after)) {
+          return { ok: false, reason: "The stylesheet rule for local frame protection changed. It was not reverted automatically." };
+        }
+        delete node.dataset.chiseloLocalFrameLocked;
+      }
       selectDirectNode(node);
     } else if (kind === "图片") {
       const image = node.matches?.("img") ? node : node.querySelector?.("img");
@@ -5098,7 +6497,8 @@
     if (!match?.rule?.style) return null;
     return {
       selector: match.selector,
-      styleText: match.rule.style.cssText || ""
+      styleText: match.rule.style.cssText || "",
+      sourceLabel: match.sheetInfo?.label || ""
     };
   }
 
@@ -5178,6 +6578,7 @@
     scheduleHTMLTreeChanged();
     scheduleHTMLDiagnosticsChanged();
 
+    clearDirectSelectionPayloadCache();
     if (isDirectSelected(image)) {
       updateSelectionBox();
       postSelectionChanged();
@@ -5193,6 +6594,7 @@
 
     pushHistory({ label: "Replace image" });
     image.setAttribute("src", src);
+    clearDirectSelectionPayloadCache();
     selectDirectNode(image);
     scheduleHTMLTreeChanged();
     postSelectionChanged();
@@ -5211,9 +6613,7 @@
   }
 
   function selectedImageNode() {
-    if (!directSelectedNode || !directSelectedNode.isConnected) return null;
-    if (directSelectedNode.matches?.("img")) return directSelectedNode;
-    return directSelectedNode.querySelector?.("img") || null;
+    return selectedImageNodeFor(directSelectedNode);
   }
 
   function styleSelectedImage(style) {
@@ -5520,6 +6920,7 @@
   function alignDirectSelected(edge) {
     const nodes = directSelectionNodes();
     if (!nodes.length) return;
+    if (!directSelectionAllowsGeometry(nodes)) return;
     pushHistory({ label: "Align objects" });
     const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
     const frame = directAlignmentFrame(directSelectedNode);
@@ -5547,6 +6948,7 @@
   function matchDirectSelectedSize(mode) {
     const nodes = topLevelDirectNodes(directSelectionNodes());
     if (nodes.length < 2 || !directSelectedNode?.isConnected) return;
+    if (!directSelectionAllowsGeometry(nodes)) return;
 
     const reference = nodes.includes(directSelectedNode) ? directSelectedNode : nodes[0];
     const referenceRect = directNodeRect(reference);
@@ -5567,6 +6969,7 @@
   function distributeDirectSelected(axis) {
     const nodes = topLevelDirectNodes(directSelectionNodes());
     if (nodes.length < 3) return;
+    if (!directSelectionAllowsGeometry(nodes)) return;
 
     const ordered = [...nodes].sort((a, b) => {
       const rectA = directNodeRect(a);
@@ -5602,6 +7005,7 @@
   function fitDirectSelected(mode) {
     const nodes = directSelectionNodes();
     if (!nodes.length) return;
+    if (!directSelectionAllowsGeometry(nodes)) return;
 
     pushHistory({ label: "Fit size" });
     const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
@@ -5628,6 +7032,7 @@
   function snapDirectSelectedToGrid(grid) {
     const nodes = directSelectionNodes();
     if (!nodes.length) return;
+    if (!directSelectionAllowsGeometry(nodes)) return;
 
     pushHistory({ label: "Snap to grid" });
     const rect = nodes.length > 1 ? directNodesBounds(nodes) : directNodeRect(directSelectedNode);
@@ -5723,7 +7128,7 @@
 
   function arrangeDirectSelected(mode) {
     const nodes = directSelectionNodes();
-    if (!nodes.length) return false;
+    if (!nodes.length || !directSelectionAllowsGeometry(nodes)) return false;
     pushHistory({ label: "Change layer order" });
     for (const node of nodes) {
       const style = node.ownerDocument.defaultView.getComputedStyle(node);
@@ -5969,8 +7374,8 @@
 
     const textStartZ = imageZ + 100;
     let textZ = textStartZ;
-    for (const node of textNodes(page)) {
-      const element = textElementFromNode(doc, node, pageRect, pageIndex + 1, textZ);
+    for (const capture of textCaptures(page)) {
+      const element = textElementFromCapture(doc, capture, pageRect, pageIndex + 1, textZ);
       if (element) {
         elements.push(element);
         textZ += 1;
@@ -6068,39 +7473,124 @@
       });
   }
 
-  function textNodes(page) {
-    const selectors = [
-      "h1,h2,h3,h4,h5,h6,p,li,blockquote,figcaption,caption,dt,dd,button,a,label,td,th,pre,code",
-      ".eyebrow,.band-subtitle,.role-emphasis,.section-title,.stat strong,.stat span,.location-text,.email",
-      "[class*='title'],[class*='heading'],[class*='subtitle'],[class*='caption'],[class*='label'],[class*='metric'],[class*='value']"
-    ];
-    const seen = new Set();
-    const nodes = [];
+  function textCaptures(page) {
+    const candidates = textCaptureCandidateNodes(page);
+    const candidateSet = new Set(candidates);
+    const textNodes = visibleTextNodes(page);
+    const textNodesByOwner = new Map();
+    const ownersWithNestedText = new Set();
 
-    for (const selector of selectors) {
-      for (const node of page.querySelectorAll(selector)) {
-        if (seen.has(node) || node.closest("svg,script,style,noscript")) continue;
-        seen.add(node);
-        nodes.push(node);
+    for (const textNode of textNodes) {
+      const owner = nearestTextCaptureOwner(textNode, candidateSet, page);
+      if (!owner) continue;
+      if (!textNodesByOwner.has(owner)) textNodesByOwner.set(owner, []);
+      textNodesByOwner.get(owner).push(textNode);
+
+      let ancestor = owner.parentElement;
+      while (ancestor && page.contains(ancestor)) {
+        if (candidateSet.has(ancestor)) ownersWithNestedText.add(ancestor);
+        if (ancestor === page) break;
+        ancestor = ancestor.parentElement;
       }
     }
 
-    for (const node of page.querySelectorAll("span,div")) {
-      if (seen.has(node) || node.closest("svg,script,style,noscript")) continue;
-      if (!hasMeaningfulDirectText(node)) continue;
-      const text = normalizedText(node);
-      if (!text || text.length > 220) continue;
-      seen.add(node);
-      nodes.push(node);
+    const captures = [];
+    for (const owner of candidates) {
+      const ownedTextNodes = textNodesByOwner.get(owner) || [];
+      if (!ownedTextNodes.length) continue;
+
+      const ownerRect = owner.getBoundingClientRect();
+
+      if (!ownersWithNestedText.has(owner) && ownerRect.width >= 1 && ownerRect.height >= 1) {
+        captures.push({
+          node: owner,
+          styleNode: owner,
+          text: normalizedText(owner),
+          rect: ownerRect,
+          sourceKind: "text"
+        });
+        continue;
+      }
+
+      for (const textNode of ownedTextNodes) {
+        const capture = textFragmentCapture(textNode, owner);
+        if (capture) captures.push(capture);
+      }
     }
 
+    return captures;
+  }
+
+  function textCaptureCandidateNodes(page) {
+    const namedSelector = [
+      ".eyebrow,.band-subtitle,.role-emphasis,.section-title,.stat strong,.stat span,.location-text,.email",
+      "[class*='title'],[class*='heading'],[class*='subtitle'],[class*='caption'],[class*='label'],[class*='metric'],[class*='value']"
+    ].join(",");
+    const nodes = uniqueElements([
+      ...page.querySelectorAll(`${DIRECT_TEXT_SELECTOR},${namedSelector}`),
+      ...[...page.querySelectorAll("*")].filter((node) => hasMeaningfulDirectText(node))
+    ]);
+
     return nodes.filter((node) => {
-      const rect = node.getBoundingClientRect();
-      if (rect.width < 5 || rect.height < 5) return false;
+      if (!node?.matches || node.closest("svg,script,style,noscript,template")) return false;
+      if (isDirectNonEditableElement(node)) return false;
       const style = node.ownerDocument.defaultView.getComputedStyle(node);
       if (!isVisibleStyle(style)) return false;
       return normalizedText(node).length > 0;
     });
+  }
+
+  function visibleTextNodes(page) {
+    const doc = page.ownerDocument;
+    const showText = doc.defaultView?.NodeFilter?.SHOW_TEXT || 4;
+    const walker = doc.createTreeWalker(page, showText);
+    const nodes = [];
+    let current = walker.nextNode();
+
+    while (current) {
+      const value = normalizedTextValue(current.textContent);
+      const parent = current.parentElement;
+      if (value && parent && !parent.closest("svg,script,style,noscript,template")) {
+        const style = doc.defaultView.getComputedStyle(parent);
+        if (isVisibleStyle(style)) nodes.push(current);
+      }
+      current = walker.nextNode();
+    }
+    return nodes;
+  }
+
+  function nearestTextCaptureOwner(textNode, candidateSet, page) {
+    let current = textNode.parentElement;
+    while (current && page.contains(current)) {
+      if (candidateSet.has(current)) return current;
+      if (current === page) break;
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  function textFragmentCapture(textNode, owner) {
+    const text = normalizedTextValue(textNode.textContent);
+    if (!text) return null;
+
+    const doc = textNode.ownerDocument;
+    const range = doc.createRange();
+    range.selectNodeContents(textNode);
+    const rect = range.getBoundingClientRect();
+    range.detach?.();
+    if (rect.width < 1 || rect.height < 1) return null;
+
+    return {
+      node: owner,
+      styleNode: textNode.parentElement || owner,
+      text,
+      rect,
+      sourceKind: "text-fragment"
+    };
+  }
+
+  function normalizedTextValue(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
   }
 
   function imageNodes(page) {
@@ -6202,24 +7692,26 @@
     };
   }
 
-  function textElementFromNode(doc, node, pageRect, pageNumber, z) {
-    const style = doc.defaultView.getComputedStyle(node);
-    const rect = roundedRect(node.getBoundingClientRect(), pageRect);
-    const text = normalizedText(node);
+  function textElementFromCapture(doc, capture, pageRect, pageNumber, z) {
+    const node = capture.node;
+    const styleNode = capture.styleNode || node;
+    const style = doc.defaultView.getComputedStyle(styleNode);
+    const rect = roundedRect(capture.rect || node.getBoundingClientRect(), pageRect);
+    const text = capture.text || normalizedText(node);
     if (!text || rect.w < 5 || rect.h < 5) return null;
 
     const fontSize = parseFloat(style.fontSize) || 16;
     const lineHeight = style.lineHeight === "normal" ? 1.2 : Math.max(0.8, (parseFloat(style.lineHeight) || fontSize * 1.2) / fontSize);
 
     return {
-      id: uniqueElementId(`p${pageNumber}-${nodeNameSlug(node)}-text`, z),
+      id: uniqueElementId(`p${pageNumber}-${nodeNameSlug(styleNode)}-text`, z),
       type: "text",
-      tagName: node.tagName.toLowerCase(),
-      htmlPath: directNodePath(node),
-      semanticRole: capturedSemanticForNode(node).role,
-      semanticLabel: capturedSemanticForNode(node).label,
-      ...capturedGroupForNode(node),
-      sourceKind: "text",
+      tagName: styleNode.tagName.toLowerCase(),
+      htmlPath: directNodePath(styleNode),
+      semanticRole: capturedSemanticForNode(styleNode).role,
+      semanticLabel: capturedSemanticForNode(styleNode).label,
+      ...capturedGroupForNode(styleNode),
+      sourceKind: capture.sourceKind || "text",
       editability: "text-editable",
       fidelity: "native",
       captureNote: "Kept as a directly editable text object",
@@ -6525,21 +8017,8 @@
     });
   }
 
-  function elementArea(element) {
-    return Math.max(1, Number(element.w || 0) * Number(element.h || 0));
-  }
-
   function cssEquivalent(left, right) {
     return String(left || "").trim().toLowerCase() === String(right || "").trim().toLowerCase();
-  }
-
-  function roundedRect(rect, parentRect) {
-    return {
-      x: Math.round(rect.left - parentRect.left),
-      y: Math.round(rect.top - parentRect.top),
-      w: Math.round(rect.width),
-      h: Math.round(rect.height)
-    };
   }
 
   function isVisibleStyle(style) {
@@ -6688,12 +8167,32 @@ ${htmlSlides}
 </html>`;
   }
 
+  function exportHTMLSavePayload() {
+    if (editorMode !== "html") {
+      return {
+        html: exportHTML(),
+        localStylesheets: []
+      };
+    }
+
+    const doc = directFrame?.contentDocument;
+    return {
+      html: exportDirectHTML(),
+      localStylesheets: doc ? localLinkedDirectStylesheets(doc).map((entry) => ({
+        fileURL: entry.sheetInfo.fileURL,
+        href: entry.sheetInfo.href || "",
+        cssText: entry.cssText
+      })) : []
+    };
+  }
+
   function exportDirectHTML() {
     const doc = directFrame?.contentDocument;
     if (!doc) return "";
+    if (!directDocumentModified && directOriginalSource) return directOriginalSource;
 
     const cloneRoot = doc.documentElement.cloneNode(true);
-    for (const node of cloneRoot.querySelectorAll("[data-chiselo-style], base[data-chiselo-base]")) {
+    for (const node of cloneRoot.querySelectorAll("[data-chiselo-style], base[data-chiselo-base], style[data-chiselo-linked-stylesheet-file]")) {
       node.remove();
     }
     if (directStylesheetWritebackCount > 0) {
@@ -6726,6 +8225,7 @@ ${htmlSlides}
   }
 
   function cleanDirectExportNode(node) {
+    window.ChiseloRuntimeSafety.restoreNode(node);
     restoreDirectExportAttribute(node, "contenteditable", "data-chiselo-edit-contenteditable");
     restoreDirectExportAttribute(node, "spellcheck", "data-chiselo-edit-spellcheck");
     for (const name of DIRECT_EDIT_STYLE_VARS) {
@@ -6768,7 +8268,7 @@ ${htmlSlides}
     };
   }
 
-  function getImportDiagnostics() {
+  function getImportDiagnostics(options = {}) {
     const doc = directFrame?.contentDocument;
     if (!doc) {
       return {
@@ -6827,12 +8327,21 @@ ${htmlSlides}
         exportArtifactCount: 0,
         textOverflowCount: 0,
         outOfBoundsCount: 0,
+        clippedGeometryCount: 0,
+        clipContainerCount: 0,
+        clippedContentCount: 0,
+        tableClipRiskCount: 0,
+        layoutManagedObjectCount: 0,
         overlapCount: 0,
         resourceElementId: null,
         tableElementId: null,
         svgElementId: null,
         textOverflowElementId: null,
         outOfBoundsElementId: null,
+        clippedGeometryElementId: null,
+        clipContainerElementId: null,
+        tableClipRiskElementId: null,
+        layoutManagedObjectElementId: null,
         overlapElementId: null,
         runtimeRiskElementId: null,
         pptxEffectRiskElementId: null,
@@ -6851,7 +8360,7 @@ ${htmlSlides}
     const svgNodes = [...doc.querySelectorAll("svg")];
     const svgImageNodes = images.filter((image) => (image.getAttribute("src") || "").startsWith("data:image/svg"));
     const svgCount = svgNodes.length + svgImageNodes.length;
-    const exported = exportDirectHTML();
+    const exported = typeof options.exportedHTML === "string" ? options.exportedHTML : exportDirectHTML();
     const exportCleanliness = collectExportCleanlinessDiagnostics(exported);
     const issues = [];
     const runtimeDiagnostics = collectRuntimeCompatibilityDiagnostics(doc, issues);
@@ -6904,6 +8413,7 @@ ${htmlSlides}
     const pptxEffectDiagnostics = collectPPTXEffectDiagnostics(doc, issues);
     const visualDiffDiagnostics = collectVisualDiffDiagnostics(doc, issues);
     const sourceMaturityDiagnostics = collectSourceMaturityDiagnostics(doc, visualDiffDiagnostics, issues);
+    const precisionEditingDiagnostics = collectPrecisionEditingDiagnostics(doc, issues);
     const layoutDiagnostics = collectLayoutDiagnostics(doc, issues);
     const canvas = directCanvas();
     const pptxMappingDiagnostics = collectPPTXMappingDiagnostics(doc, {
@@ -6971,12 +8481,21 @@ ${htmlSlides}
       exportArtifactCount: exportCleanliness.exportArtifactCount,
       textOverflowCount: layoutDiagnostics.textOverflowCount,
       outOfBoundsCount: layoutDiagnostics.outOfBoundsCount,
+      clippedGeometryCount: layoutDiagnostics.clippedGeometryCount,
+      clipContainerCount: precisionEditingDiagnostics.clipContainerCount,
+      clippedContentCount: precisionEditingDiagnostics.clippedContentCount,
+      tableClipRiskCount: precisionEditingDiagnostics.tableClipRiskCount,
+      layoutManagedObjectCount: precisionEditingDiagnostics.layoutManagedObjectCount,
       overlapCount: layoutDiagnostics.overlapCount,
       resourceElementId: optionalDirectId(brokenImageNodes[0] || brokenMediaNodes[0] || images[0] || media[0] || null),
       tableElementId: tableTargetElementId,
       svgElementId: svgTargetElementId,
       textOverflowElementId: layoutDiagnostics.textOverflowElementId,
       outOfBoundsElementId: layoutDiagnostics.outOfBoundsElementId,
+      clippedGeometryElementId: layoutDiagnostics.clippedGeometryElementId,
+      clipContainerElementId: precisionEditingDiagnostics.clipContainerElementId,
+      tableClipRiskElementId: precisionEditingDiagnostics.tableClipRiskElementId,
+      layoutManagedObjectElementId: precisionEditingDiagnostics.layoutManagedObjectElementId,
       overlapElementId: layoutDiagnostics.overlapElementId,
       runtimeRiskElementId: runtimeDiagnostics.runtimeRiskElementId,
       pptxEffectRiskElementId: pptxEffectDiagnostics.pptxEffectRiskElementId,
@@ -7145,6 +8664,19 @@ ${htmlSlides}
       }).length;
   }
 
+  // These values are stable internal protocol keys shared with Swift. Convert them only when
+  // they become visible text. Do not change the keys used by filters, revert logic, or payloads.
+  function visualKindLabel(kind) {
+    return {
+      "图片": "Image",
+      "文字": "Text",
+      "样式": "Style",
+      "位置/尺寸": "Position/Size",
+      "删除对象": "Deleted Object",
+      "新增对象": "Added Object"
+    }[kind] || kind;
+  }
+
   function collectVisualDiffDiagnostics(doc, issues) {
     if (!directVisualBaseline?.entries) {
       return {
@@ -7185,7 +8717,7 @@ ${htmlSlides}
       changedKinds.add(record.kind);
       const revertInfo = visualChangeRevertInfo(record.kind, record.before, record.after);
       if (revertInfo.canRevert) revertableVisualChangeCount += 1;
-      if (record.before && record.after && record.before.styleAttr !== record.after.styleAttr) inlineStyleChangeCount += 1;
+      if (visualChangeWritebackKind(record.before, record.after) === "inline-style") inlineStyleChangeCount += 1;
       if (visualChangeItems.length < MAX_VISUAL_CHANGE_PREVIEW_ITEMS) {
         visualChangeItems.push(visualChangePreviewItem({
           key: record.key,
@@ -7226,201 +8758,27 @@ ${htmlSlides}
   }
 
   function filterVisualChangeRecords(records) {
-    return records.filter((record) => !isDuplicateAncestorVisualChange(record, records));
+    return visualChangeLogic.filterRecords(records);
   }
 
-  function isDuplicateAncestorVisualChange(record, records) {
-    if (!record?.key || record.kind !== "文字") return false;
-    const childPrefix = `${record.key} > `;
-    return records.some((other) => (
-      other !== record
-      && other.kind === "文字"
-      && typeof other.key === "string"
-      && other.key.startsWith(childPrefix)
-    ));
-  }
-
-  function visualChangePreviewItem({ key, kind, before, after, revertInfo }) {
-    const entry = after || before || {};
-    const rect = entry?.rect || {};
-    const detail = visualChangeDetail(kind, before, after);
-    const writebackKind = visualChangeWritebackKind(before, after);
-    const writebackTarget = visualChangeWritebackTarget(writebackKind, before, after);
-    return {
-      changeKey: key || null,
-      elementId: entry?.elementId || null,
-      label: truncateDiagnosticText(entry?.label || "", "Object"),
-      kind,
-      detail: detail.detail,
-      beforeValue: detail.beforeValue,
-      afterValue: detail.afterValue,
-      writebackKind,
-      writebackLabel: visualChangeWritebackLabel(writebackKind),
-      writebackTarget,
-      canRevert: Boolean(revertInfo?.canRevert),
-      revertReason: revertInfo?.reason || null,
-      x: Math.round(Number(rect.x || 0)),
-      y: Math.round(Number(rect.y || 0)),
-      w: Math.round(Number(rect.w || 0)),
-      h: Math.round(Number(rect.h || 0))
-    };
+  function visualChangePreviewItem(input) {
+    return visualChangeLogic.previewItem(input);
   }
 
   function visualChangeWritebackKind(before, after) {
-    if (!before || !after) return null;
-    if (String(before.styleAttr || "") !== String(after.styleAttr || "")) return "inline-style";
-    if (visualStylesheetRuleDiffers(before, after)) return "stylesheet-rule";
-    return null;
+    return visualChangeLogic.writebackKind(before, after);
   }
 
-  function visualChangeWritebackTarget(kind, before, after) {
-    if (kind === "inline-style") return "style";
-    if (kind === "stylesheet-rule") return after?.stylesheetRule?.selector || before?.stylesheetRule?.selector || null;
-    return null;
-  }
-
-  function visualChangeWritebackLabel(kind) {
-    if (kind === "inline-style") return "inline style";
-    if (kind === "stylesheet-rule") return "CSS rule";
-    return null;
+  function visualChangeIsLocalFrameStabilityOnly(before, after) {
+    return visualChangeLogic.isLocalFrameStabilityOnly(before, after);
   }
 
   function visualChangeRevertInfo(kind, before, after) {
-    if (!before && after) {
-      return { canRevert: true, reason: null };
-    }
-    if (before && !after) {
-      return before.outerHTML && before.parentKey
-        ? { canRevert: true, reason: null }
-        : { canRevert: false, reason: "The deleted object has no restorable source snapshot. Restore from Version History or rebuild it manually." };
-    }
-    if (!before || !after) {
-      return { canRevert: false, reason: "Missing the at-open or current snapshot for this object." };
-    }
-
-    if (kind === "文字") {
-      if (before.childElementCount > 0 || after.childElementCount > 0) {
-        return { canRevert: false, reason: "The object contains inline structure, so an automatic revert could break the source hierarchy." };
-      }
-      if (String(before.text || "").length > MAX_VISUAL_REVERT_TEXT_LENGTH) {
-        return { canRevert: false, reason: "The text is too long. Locate it and review manually." };
-      }
-      return { canRevert: true, reason: null };
-    }
-
-    if (kind === "图片") {
-      return after.imageSource !== undefined
-        ? { canRevert: true, reason: null }
-        : { canRevert: false, reason: "This object is not a replaceable image." };
-    }
-
-    if (kind === "位置/尺寸" || kind === "样式") {
-      return before.styleAttr !== after.styleAttr || visualStylesheetRuleDiffers(before, after)
-        ? { canRevert: true, reason: null }
-        : { canRevert: false, reason: "The change comes from a stylesheet, a responsive rule, or the parent layout. Locating it and reviewing manually is safer." };
-    }
-
-    return { canRevert: false, reason: "This kind of change does not support one-step revert yet." };
+    return visualChangeLogic.revertInfo(kind, before, after);
   }
 
-  function visualChangeDetail(kind, before, after) {
-    if (!before && after) {
-      return {
-        detail: "Added object. Reverting will remove this object from the current HTML.",
-        beforeValue: "none",
-        afterValue: visualRectText(after.rect)
-      };
-    }
-    if (before && !after) {
-      return {
-        detail: "The object was deleted. You can try restoring it to its position at open in one step.",
-        beforeValue: visualRectText(before.rect),
-        afterValue: "deleted"
-      };
-    }
-    if (!before || !after) {
-      return { detail: "No comparable snapshot available.", beforeValue: null, afterValue: null };
-    }
-
-    if (kind === "位置/尺寸") {
-      return {
-        detail: "Position or size changed.",
-        beforeValue: visualRectText(before.rect),
-        afterValue: visualRectText(after.rect)
-      };
-    }
-    if (kind === "文字") {
-      return {
-        detail: "Text content changed.",
-        beforeValue: truncateDiagnosticText(before.text, "empty text"),
-        afterValue: truncateDiagnosticText(after.text, "empty text")
-      };
-    }
-    if (kind === "图片") {
-      return {
-        detail: "Image source changed.",
-        beforeValue: visualSourceLabel(before.imageSource),
-        afterValue: visualSourceLabel(after.imageSource)
-      };
-    }
-
-    const changedStyles = visualStyleDiffKeys(before.style, after.style);
-    const detailSuffix = visualStylesheetRuleDiffers(before, after) ? " (written back to the stylesheet rule)" : "";
-    return {
-      detail: changedStyles.length ? `Key style changes: ${changedStyles.join(", ")}${detailSuffix}` : `Key styles changed${detailSuffix}.`,
-      beforeValue: visualStyleSummary(before.style, changedStyles),
-      afterValue: visualStyleSummary(after.style, changedStyles)
-    };
-  }
-
-  function visualRectText(rect) {
-    if (!rect) return "";
-    return `x ${Math.round(rect.x || 0)}, y ${Math.round(rect.y || 0)}, ${Math.round(rect.w || 0)} x ${Math.round(rect.h || 0)}`;
-  }
-
-  function visualSourceLabel(value) {
-    const source = String(value || "").trim();
-    if (!source) return "empty";
-    if (source.startsWith("data:")) return "embedded image";
-    return truncateDiagnosticText(source.split(/[/?#]/).filter(Boolean).pop() || source, source);
-  }
-
-  function visualStyleDiffKeys(before = {}, after = {}) {
-    const labels = {
-      color: "Text color",
-      background: "Background",
-      borderColor: "Border color",
-      borderWidth: "Border width",
-      radius: "Corner radius",
-      fontSize: "Font size",
-      fontWeight: "Font weight",
-      textAlign: "Alignment",
-      objectFit: "Image fit",
-      opacity: "Opacity",
-      shadow: "Shadow"
-    };
-    return Object.keys(labels).filter((key) => JSON.stringify(before?.[key]) !== JSON.stringify(after?.[key])).map((key) => labels[key]);
-  }
-
-  function visualStyleSummary(style = {}, changedKeys = []) {
-    if (!changedKeys.length) return "";
-    const reverseLabels = {
-      "Text color": "color",
-      "Background": "background",
-      "Border color": "borderColor",
-      "Border width": "borderWidth",
-      "Corner radius": "radius",
-      "Font size": "fontSize",
-      "Font weight": "fontWeight",
-      "Alignment": "textAlign",
-      "Image fit": "objectFit",
-      "Opacity": "opacity",
-      "Shadow": "shadow"
-    };
-    return changedKeys
-      .slice(0, 3)
-      .map((label) => `${label} ${truncateDiagnosticText(style?.[reverseLabels[label]], "empty")}`)
-      .join("; ");
+  function visualEntryChangeKind(before, after) {
+    return visualChangeLogic.entryChangeKind(before, after);
   }
 
   function collectSourceMaturityDiagnostics(doc, visualDiffDiagnostics, issues) {
@@ -7857,37 +9215,6 @@ ${htmlSlides}
     return hasFill || hasBorder || hasRadius || hasShadow;
   }
 
-  // These `kind` values are internal protocol values shared with Swift. They are compared, not
-  // shown: the revert paths below and VisualChangeFilter/icon helpers on the Swift side match on
-  // them, and Swift maps them to English at the display boundary via VisualKindLabel. Changing a
-  // value here requires updating every consumer in this file, DeckModel.swift, ContentView.swift,
-  // and the visual-change tests together.
-  function visualKindLabel(kind) {
-    return {
-      "图片": "Image",
-      "文字": "Text",
-      "样式": "Style",
-      "位置/尺寸": "Position/Size",
-      "删除对象": "Deleted Object",
-      "新增对象": "Added Object"
-    }[kind] || kind;
-  }
-
-  function visualEntryChangeKind(before, after) {
-    if (before.imageSource !== after.imageSource) return "图片";
-    if (before.text !== after.text && !(before.childElementCount > 0 || after.childElementCount > 0)) return "文字";
-    if (JSON.stringify(before.style) !== JSON.stringify(after.style)) return "样式";
-    if (rectDiffers(before.rect, after.rect)) return "位置/尺寸";
-    return null;
-  }
-
-  function rectDiffers(before, after) {
-    if (!before || !after) return true;
-    return Math.abs(before.x - after.x) > 2
-      || Math.abs(before.y - after.y) > 2
-      || Math.abs(before.w - after.w) > 2
-      || Math.abs(before.h - after.h) > 2;
-  }
 
   function collectPPTXEffectDiagnostics(doc, issues) {
     const nodes = diagnosticLayoutNodes(doc).slice(0, MAX_HTML_DIAGNOSTIC_NODES);
@@ -7948,7 +9275,49 @@ ${htmlSlides}
     return {
       ...collectTextOverflowIssues(doc, issues),
       ...collectOutOfBoundsIssues(doc, issues),
+      ...collectClippedGeometryIssues(doc, issues),
       ...collectOverlapIssues(doc, issues)
+    };
+  }
+
+  function collectPrecisionEditingDiagnostics(doc, issues) {
+    const clipContainers = precisionClipContainerNodes(doc);
+    const clippedContent = clipContainers.filter((node) => hasContainerOverflowContent(node));
+    const tableClipRiskNodes = clipContainers.filter((node) => node.matches?.("table"));
+    const layoutManagedNodes = diagnosticLayoutNodes(doc).filter((node) => isLayoutManagedGeometryNode(node));
+    const clipContainerElementId = optionalDirectId(clipContainers[0] || null);
+    const tableClipRiskElementId = optionalDirectId(tableClipRiskNodes[0] || null);
+    const layoutManagedObjectElementId = optionalDirectId(layoutManagedNodes[0] || null);
+
+    if (tableClipRiskNodes.length > 0) {
+      addDiagnosticIssue(issues, {
+        kind: "table-clip-risk",
+        severity: "info",
+        title: "Table Clipping Boundary",
+        detail: `${tableClipRiskNodes.length} tables use overflow to manage visible boundaries. Select a whole table to change its position. Change only text and styles in cells.`,
+        elementId: tableClipRiskElementId
+      });
+    }
+
+    const nonTableClipCount = clipContainers.length - tableClipRiskNodes.length;
+    if (nonTableClipCount > 0) {
+      addDiagnosticIssue(issues, {
+        kind: "clip-container-risk",
+        severity: "info",
+        title: "Clipping Container",
+        detail: `${clipContainers.length} containers clip or scroll overflowing content. Confirm the parent container and visible boundary before moving an internal object.`,
+        elementId: clipContainerElementId
+      });
+    }
+
+    return {
+      clipContainerCount: clipContainers.length,
+      clippedContentCount: clippedContent.length,
+      clipContainerElementId,
+      tableClipRiskCount: tableClipRiskNodes.length,
+      tableClipRiskElementId,
+      layoutManagedObjectCount: layoutManagedNodes.length,
+      layoutManagedObjectElementId
     };
   }
 
@@ -8004,6 +9373,37 @@ ${htmlSlides}
     return { outOfBoundsCount: count, outOfBoundsElementId: firstElementId };
   }
 
+  function collectClippedGeometryIssues(doc, issues) {
+    const nodes = diagnosticLayoutNodes(doc)
+      .filter((node) => isPositionedDiagnosticNode(node));
+    let count = 0;
+    let firstElementId = null;
+
+    for (const node of nodes) {
+      const frameNode = clippingFrameNodeFor(node, { includeScroll: true, scrollOnly: true });
+      if (!frameNode) continue;
+      const frame = diagnosticFrameForClipNode(frameNode);
+      const rect = directNodeRect(node);
+      const overflow = rectOverflowAmount(rect, frame);
+      if (overflow <= 4) continue;
+
+      count += 1;
+      const elementId = ensureDirectId(node);
+      const relatedElementId = ensureDirectId(frameNode);
+      if (!firstElementId) firstElementId = elementId;
+      addDiagnosticIssue(issues, {
+        kind: "clipped-geometry",
+        severity: "error",
+        title: "Content Clipped",
+        detail: `${diagnosticNodeLabel(node)} extends ${Math.round(overflow)}px beyond the scrolling or clipping boundary of ${diagnosticNodeLabel(frameNode)}`,
+        elementId,
+        relatedElementId
+      });
+    }
+
+    return { clippedGeometryCount: count, clippedGeometryElementId: firstElementId };
+  }
+
   function collectOverlapIssues(doc, issues) {
     const nodes = diagnosticLayoutNodes(doc)
       .filter((node) => isOverlapDiagnosticNode(node))
@@ -8057,7 +9457,8 @@ ${htmlSlides}
       severity: issue.severity || "warning",
       title: issue.title,
       detail: issue.detail,
-      elementId: issue.elementId || null
+      elementId: issue.elementId || null,
+      relatedElementId: issue.relatedElementId || null
     });
   }
 
@@ -8120,34 +9521,65 @@ ${htmlSlides}
     return directPageFrameNodeFor(node);
   }
 
-  function clippingFrameNodeFor(node) {
+  function clippingFrameNodeFor(node, options = {}) {
     const doc = node.ownerDocument;
     let parent = node.parentElement;
     while (parent && parent !== doc.body && parent !== doc.documentElement) {
-      if (isDiagnosticClipFrame(parent)) return parent;
+      if (isDiagnosticClipFrame(parent, options)) return parent;
       parent = parent.parentElement;
     }
     return null;
   }
 
-  function isDiagnosticClipFrame(node) {
+  function isDiagnosticClipFrame(node, options = {}) {
     if (!node || node.matches?.("html,body")) return false;
     const style = node.ownerDocument.defaultView.getComputedStyle(node);
     const overflow = `${style.overflowX} ${style.overflowY}`.toLowerCase();
-    if (!/(hidden|clip)/.test(overflow)) return false;
+    const pattern = options.includeScroll ? /(hidden|clip|auto|scroll)/ : /(hidden|clip)/;
+    if (!pattern.test(overflow)) return false;
+    if (options.scrollOnly && !/(auto|scroll)/.test(overflow)) return false;
 
     const rect = node.getBoundingClientRect();
     return rect.width >= 80 && rect.height >= 40;
   }
 
-  function rectOverflowAmount(rect, frame) {
-    return Math.max(
-      frame.x - rect.x,
-      frame.y - rect.y,
-      rect.x + rect.w - (frame.x + frame.w),
-      rect.y + rect.h - (frame.y + frame.h),
-      0
-    );
+  function diagnosticFrameForClipNode(node) {
+    const rect = directNodeRect(node);
+    const width = node.clientWidth || rect.w;
+    const height = node.clientHeight || rect.h;
+    return { x: rect.x, y: rect.y, w: Math.max(1, width), h: Math.max(1, height) };
+  }
+
+  function precisionClipContainerNodes(doc) {
+    const nodes = [...doc.querySelectorAll("body *")]
+      .slice(0, MAX_HTML_DIAGNOSTIC_NODES)
+      .filter((node) => {
+        if (!node || node.matches?.("script,style,meta,link,title,defs")) return false;
+        if (!isDirectNodeVisible(node) || isDecorativeDirectNode(node)) return false;
+        if (!isDiagnosticClipFrame(node, { includeScroll: true })) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width >= 80 && rect.height >= 32;
+      });
+    return uniqueElements(nodes);
+  }
+
+  function hasContainerOverflowContent(node) {
+    if (!node) return false;
+    const tolerance = 2;
+    return node.scrollWidth > node.clientWidth + tolerance || node.scrollHeight > node.clientHeight + tolerance;
+  }
+
+  function isLayoutManagedGeometryNode(node) {
+    if (!node || node.matches?.("html,body")) return false;
+    if (directGeometryLockedNode(node)) return true;
+    const win = node.ownerDocument.defaultView;
+    const style = win.getComputedStyle(node);
+    const parentStyle = node.parentElement ? win.getComputedStyle(node.parentElement) : null;
+    const parentDisplay = String(parentStyle?.display || "");
+    return parentDisplay.includes("flex")
+      || parentDisplay.includes("grid")
+      || style.display.includes("table")
+      || style.position === "sticky";
   }
 
   function isOverlapDiagnosticNode(node) {
@@ -8171,19 +9603,6 @@ ${htmlSlides}
     return isPositionedDiagnosticNode(first) && isPositionedDiagnosticNode(second);
   }
 
-  function rectIntersection(first, second) {
-    const left = Math.max(first.x, second.x);
-    const top = Math.max(first.y, second.y);
-    const right = Math.min(first.x + first.w, second.x + second.w);
-    const bottom = Math.min(first.y + first.h, second.y + second.h);
-    if (right <= left || bottom <= top) return null;
-    return { x: left, y: top, w: right - left, h: bottom - top };
-  }
-
-  function rectArea(rect) {
-    return Math.max(0, rect.w) * Math.max(0, rect.h);
-  }
-
   function diagnosticNodeLabel(node) {
     const tag = node.tagName.toLowerCase();
     const id = node.id ? `#${node.id}` : "";
@@ -8203,12 +9622,13 @@ ${htmlSlides}
   function selectHTML(selector, options = {}) {
     if (editorMode !== "html") return null;
     const node = directFrame?.contentDocument?.querySelector(selector);
-    if (!node) return null;
+    if (!node || isDirectRootNode(node) || isDirectNonEditableElement(node)) return null;
     if (options?.additive) {
       setDirectSelection([...directSelectionNodes(), node], node);
     } else {
       selectDirectNode(node);
     }
+    if (options?.reveal !== false) revealDirectNode(node, { immediate: options?.immediate });
     return selectedElement();
   }
 
@@ -8220,13 +9640,13 @@ ${htmlSlides}
     if (editorMode !== "html") return null;
     const escapedId = cssEscape(id);
     const node = directFrame?.contentDocument?.querySelector(`[data-chiselo-id="${escapedId}"]`);
-    if (!node) return null;
+    if (!node || isDirectRootNode(node) || isDirectNonEditableElement(node)) return null;
     if (additive) {
       setDirectSelection([...directSelectionNodes(), node], node);
     } else {
       selectDirectNode(node);
     }
-    node.scrollIntoView?.({ block: "center", inline: "center", behavior: "smooth" });
+    revealDirectNode(node);
     return selectedElement();
   }
 
@@ -8235,7 +9655,7 @@ ${htmlSlides}
     const doc = directFrame?.contentDocument;
     if (!doc) return null;
 
-    const node = directTopSelectableTargetAtPoint(doc, x, y) || doc.body;
+    const node = directTopSelectableTargetAtPoint(doc, x, y);
     if (!node) return null;
 
     const selectionPayload = directElementPayloadForNode(node, directNodeRect(node));
@@ -8264,10 +9684,12 @@ ${htmlSlides}
   }
 
   function setSelectedHTMLText(text) {
-    if (editorMode !== "html" || !directSelectedNode) return null;
+    if (editorMode !== "html" || !directSelectedNode || !directNodeAllowsTextEdit(directSelectedNode)) return null;
     pushHistory({ label: "Edit text" });
+    lockDirectLocalEditFrame(directSelectedNode);
     directSelectedNode.textContent = text;
     updateSelectionBox();
+    updateDirectSelectionPayloadCache({ text });
     scheduleHTMLTreeChanged();
     postSelectionChanged();
     return selectedElement();
@@ -8398,6 +9820,20 @@ ${htmlSlides}
     document.documentElement.dataset.backdrop = allowed.has(style) ? style : "clean";
   }
 
+  function setHTMLPreviewWidth(width) {
+    if (editorMode !== "html") return null;
+    const numericWidth = Number(width);
+    directPreviewWidth = width !== null && width !== undefined && Number.isFinite(numericWidth)
+      ? clampNumber(Math.round(numericWidth), 320, 2560)
+      : null;
+    directCanvasSize = null;
+    // One synchronous layout pass keeps the iframe's CSS viewport in sync
+    // immediately and avoids the previous render-then-render-again jump.
+    renderDirectHTML({ preserveScale: true });
+    scheduleHTMLDiagnosticsChanged({ delay: 40, idleTimeout: 800 });
+    return { width: directPreviewWidth, mode: directPreviewWidth ? "fixed" : "original" };
+  }
+
   function getVisualReviewSnapshotRect() {
     return visualReviewSnapshotInfo().rect;
   }
@@ -8480,11 +9916,15 @@ ${htmlSlides}
 
   window.ChiseloEditor = {
     addHTMLToSelection,
+    applySelectedHTMLAttributes,
     applySelectedHTMLSource,
+    applySelectedStylesheetRule,
     command,
     exportHTML,
+    exportHTMLSavePayload,
     getDeck: () => clone(deck),
     clearDirty,
+    markSavedFromBase64,
     getHTMLTree: buildHTMLTree,
     getHTMLSummary,
     getImportDiagnostics,
@@ -8519,17 +9959,23 @@ ${htmlSlides}
     loadDeckFromBase64,
     newDeck,
     openHTMLFromBase64,
+    getPseudoPreviewState: () => directPseudoPreviewState,
     selectElementById,
     selectGroupById,
     selectSlide,
     selectHTML,
     selectHTMLById,
     selectHTMLAtPoint,
+    setPseudoPreviewState,
     replaceSelectedImageFromBase64,
     replaceSelectedImageSrc,
+    selectNodesForSelectedStylesheetRule,
     settleSelectedImage,
     setBackdropStyle,
+    setHTMLPreviewWidth,
+    setHTMLZoomPreset,
     setSelectedHTMLText,
+    validateSelectedStylesheetRule,
     validateSelectedHTMLSource,
     updateElement
   };
