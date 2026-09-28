@@ -3,6 +3,7 @@ import path from "node:path";
 
 const root = process.cwd();
 const sourceRoot = path.join(root, "Chiselo");
+const packageScriptPath = path.join(root, "scripts", "package-dmg.sh");
 const nonEnglishUIPattern = /[\u3400-\u4dbf\u4e00-\u9fff；，。！？，、：（）【】]/;
 const sourceExtensions = new Set([".swift", ".js", ".mjs", ".html", ".css", ".json"]);
 
@@ -38,6 +39,11 @@ function sourceFiles(directory) {
 }
 
 const failures = [];
+const packageScript = fs.readFileSync(packageScriptPath, "utf8");
+if (!/<key>CFBundleDevelopmentRegion<\/key>\s*<string>en<\/string>/.test(packageScript)) {
+  failures.push("scripts/package-dmg.sh: packaged app development language must be English");
+}
+
 for (const absolute of sourceFiles(sourceRoot)) {
   const relative = path.relative(root, absolute);
   const allowlist = allowedInternalProtocolLines.get(relative) || [];
